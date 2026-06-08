@@ -45,6 +45,7 @@
   let state = null;
   let mode = "start";
   let pausedForUpgrade = false;
+  let audioPanelPausedGame = false;
 
   const rand = (a, b) => a + Math.random() * (b - a);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -107,7 +108,6 @@
     se: {
       damage: "Audio/SE/1_single_damage.mp3",
       select: "Audio/SE/3_heal_resurrection.mp3",
-      shoot: "Audio/SE/2_area_damage.mp3",
     }
   };
 
@@ -184,23 +184,45 @@
 
   function playSe(id, cooldown = 0.08) {
     initAudio();
-    const base = audioState.se[id];
-    if (!base || audioState.settings.muted) return;
+    const a = audioState.se[id];
+    if (!a || audioState.settings.muted) return;
     const now = performance.now();
     if ((audioState.lastSe[id] || 0) + cooldown * 1000 > now) return;
     audioState.lastSe[id] = now;
     try {
-      const a = base.cloneNode(true);
+      a.pause();
+      a.currentTime = 0;
       a.volume = clamp(audioState.settings.se ?? 0.7, 0, 1);
       const promise = a.play();
       if (promise && promise.catch) promise.catch(() => {});
     } catch {}
   }
 
+  function setAudioPanel(open) {
+    if (!ui.audioPanel) return;
+    ui.audioPanel.classList.toggle("active", !!open);
+    ui.audioPanel.setAttribute("aria-hidden", open ? "false" : "true");
+    if (state && mode === "game" && !pausedForUpgrade && !state.ended) {
+      if (open) {
+        audioPanelPausedGame = !state.paused;
+        state.paused = true;
+        draw();
+      } else if (audioPanelPausedGame) {
+        audioPanelPausedGame = false;
+        state.paused = false;
+        last = performance.now();
+        requestAnimationFrame(loop);
+      }
+    }
+  }
+
   function toggleAudioPanel() {
     if (!ui.audioPanel) return;
-    ui.audioPanel.classList.toggle("active");
-    ui.audioPanel.setAttribute("aria-hidden", ui.audioPanel.classList.contains("active") ? "false" : "true");
+    setAudioPanel(!ui.audioPanel.classList.contains("active"));
+  }
+
+  function isAudioControlTarget(target) {
+    return !!(target && (target.closest?.("#audioPanel") || target.closest?.("#audioBtn")));
   }
 
   const imageCache = new Map();
@@ -374,6 +396,8 @@
       ended: false,
     };
     pausedForUpgrade = false;
+    audioPanelPausedGame = false;
+    setAudioPanel(false);
     initAudio();
     playBgm("raid", true);
     setScreen("game");
@@ -614,7 +638,6 @@
     const baseDamage = s.player.damage * piercePenalty;
     const mainColor = s.evolutions.pierceShotgun ? "#ff5fa2" : (s.player.pierce >= 3 ? "#ff9f43" : s.player.color);
     s.bullets.push({ x: s.player.x, y: s.player.y, vx: Math.cos(a) * 400, vy: Math.sin(a) * 400, r: s.evolutions.pierceShotgun ? 6 : 5, damage: baseDamage, life: 1.22, pierce: s.player.pierce, color: mainColor, owner: "player", glow: !!s.evolutions.pierceShotgun });
-    if (s.player.pierce > 0 || s.player.shotgun > 0 || s.evolutions.holyShot || s.evolutions.pierceShotgun) playSe("shoot", 0.22);
     if (s.player.shotgun > 0) {
       let pellets = Math.min(2 + s.player.shotgun * 2, 8);
       let spread = Math.min(0.32 + s.player.shotgun * 0.06, 0.62);
@@ -1301,17 +1324,18 @@
   document.getElementById("titleBtn").addEventListener("click", () => { stopAllBgm(); updateBestText(); setScreen("start"); });
   document.getElementById("pauseBtn").addEventListener("click", () => { if (!state || pausedForUpgrade) return; state.paused = !state.paused; last = performance.now(); if (!state.paused) requestAnimationFrame(loop); draw(); });
   if (ui.goldChestBtn) ui.goldChestBtn.addEventListener("click", showGoldChest);
-  if (ui.audioBtn) ui.audioBtn.addEventListener("click", toggleAudioPanel);
-  if (ui.bgmVolume) ui.bgmVolume.addEventListener("input", () => { audioState.settings.bgm = Number(ui.bgmVolume.value) / 100; saveAudioSettings(); applyAudioVolumes(); });
-  if (ui.seVolume) ui.seVolume.addEventListener("input", () => { audioState.settings.se = Number(ui.seVolume.value) / 100; saveAudioSettings(); applyAudioVolumes(); });
-  if (ui.muteBtn) ui.muteBtn.addEventListener("click", () => { audioState.settings.muted = !audioState.settings.muted; saveAudioSettings(); applyAudioVolumes(); });
+  if (ui.audioBtn) ui.audioBtn.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); initAudio(); toggleAudioPanel(); });
+  if (ui.bgmVolume) ui.bgmVolume.addEventListener("input", e => { e.stopPropagation(); audioState.settings.bgm = Number(ui.bgmVolume.value) / 100; saveAudioSettings(); applyAudioVolumes(); });
+  if (ui.seVolume) ui.seVolume.addEventListener("input", e => { e.stopPropagation(); audioState.settings.se = Number(ui.seVolume.value) / 100; saveAudioSettings(); applyAudioVolumes(); });
+  if (ui.muteBtn) ui.muteBtn.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); audioState.settings.muted = !audioState.settings.muted; saveAudioSettings(); applyAudioVolumes(); });
+  if (ui.audioPanel) ["pointerdown", "pointermove", "pointerup", "touchstart", "touchmove", "touchend", "click"].forEach(type => ui.audioPanel.addEventListener(type, e => e.stopPropagation(), { passive: type === "touchmove" ? false : true }));
 
   window.addEventListener("resize", resize);
   window.addEventListener("orientationchange", () => setTimeout(resize, 250));
   document.addEventListener("selectstart", e => e.preventDefault());
   document.addEventListener("dragstart", e => e.preventDefault());
   document.addEventListener("contextmenu", e => { if (mode === "game") e.preventDefault(); });
-  document.addEventListener("touchmove", e => { if (mode === "game") e.preventDefault(); }, { passive: false });
+  document.addEventListener("touchmove", e => { if (mode === "game" && !isAudioControlTarget(e.target)) e.preventDefault(); }, { passive: false });
   window.addEventListener("keydown", e => { if (state) state.keys[e.key] = true; if (e.key === "Escape" && state) state.paused = !state.paused; });
   window.addEventListener("keyup", e => { if (state) state.keys[e.key] = false; });
 
