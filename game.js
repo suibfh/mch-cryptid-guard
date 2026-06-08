@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const STORAGE_KEY = "mch_cryptid_guard_test_v2";
+  const STORAGE_KEY = "mch_cryptid_guard_test_v3";
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
 
@@ -27,6 +27,7 @@
     stick: document.getElementById("stick"),
     knob: document.getElementById("knob"),
     gameScreen: document.getElementById("gameScreen"),
+    stickSideBtn: document.getElementById("stickSideBtn"),
   };
 
   const W = 960;
@@ -45,13 +46,28 @@
   const angleTo = (a, b) => Math.atan2(b.y - a.y, b.x - a.x);
 
   function loadSave() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || { best: 0, plays: 0 }; }
-    catch { return { best: 0, plays: 0 }; }
+    try { return { best: 0, plays: 0, stickSide: "right", ...(JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}) }; }
+    catch { return { best: 0, plays: 0, stickSide: "right" }; }
   }
   function save(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
   function updateBestText() {
     const s = loadSave();
     ui.best.textContent = `最高スコア: ${s.best || 0} / プレイ回数: ${s.plays || 0}`;
+    applyStickSide(s.stickSide || "right");
+  }
+
+  function applyStickSide(side) {
+    const chosen = side === "left" ? "left" : "right";
+    document.body.classList.toggle("stick-right", chosen === "right");
+    document.body.classList.toggle("stick-left", chosen === "left");
+    if (ui.stickSideBtn) ui.stickSideBtn.textContent = `操作パッド: ${chosen === "right" ? "右" : "左"}`;
+  }
+
+  function toggleStickSide() {
+    const saved = loadSave();
+    saved.stickSide = (saved.stickSide || "right") === "right" ? "left" : "right";
+    save(saved);
+    applyStickSide(saved.stickSide);
   }
 
   const heroDefs = {
@@ -76,7 +92,8 @@
     wall: { name: "結界", desc: "クリプタイドの周囲に防衛弾を追加。", apply: s => s.cryptid.wall++ },
     heal: { name: "再生", desc: "クリプタイドのHPを少し回復する。", apply: s => s.cryptid.hp = clamp(s.cryptid.hp + 22, 0, s.cryptid.maxHp) },
     slow: { name: "遅滞領域", desc: "クリプタイド周辺の敵を遅くする。", apply: s => s.cryptid.slow += 0.08 },
-    pierce: { name: "貫通弾", desc: "通常攻撃が1体貫通する。火力が安定する。", apply: s => s.player.pierce++ },
+    pierce: { name: "貫通弾", desc: "通常攻撃が1体貫通。弾の威力は少し下がるが密集に強い。", apply: s => s.player.pierce++ },
+    shotgun: { name: "散弾", desc: "近距離へ扇形に追加弾を放つ。大量の敵を押し返しやすい。", apply: s => s.player.shotgun++ },
     burst: { name: "CE爆発", desc: "CE取得時、近くの敵に小ダメージ。", apply: s => s.player.ceBurst += 7 },
     shield: { name: "緊急盾", desc: "大きな被害を一度だけ防ぐ盾を得る。", apply: s => s.cryptid.shields++ },
   };
@@ -123,8 +140,10 @@
       gems: [],
       floaters: [],
       keys: {},
+      stats: { enemyScore: 0, ceScore: 0, clearBonus: 0, hpBonus: 0, killBonus: 0, ceCollected: 0, upgrades: 0 },
+      upgradeCounts: {},
       stick: { active: false, x: 0, y: 0 },
-      player: { x: W / 2, y: H / 2 + 118, r: 14, ...base, fire: 0, orbits: base.aura ? 1 : 0, pierce: 0, ceBurst: 0 },
+      player: { x: W / 2, y: H / 2 + 118, r: 14, ...base, fire: 0, orbits: base.aura ? 1 : 0, pierce: 0, ceBurst: 0, shotgun: 0 },
       cryptid: { x: W / 2, y: H / 2, r: 32, hp: 100, maxHp: 100, wall: 0, slow: 0, shields: 1, hitFlash: 0 },
       paused: false,
       ended: false,
@@ -155,7 +174,9 @@
 
   function spawnBudget(s) {
     const phase = currentPhase(s.t);
-    let budget = 0.72 + phase * 0.58;
+    let budget = 0.74 + phase * 0.62;
+    if (phase >= 4) budget += 0.35;
+    if (phase >= 5) budget += 0.55;
     if (s.t < 25) budget *= 0.72;
     if (s.cryptid.hp < 55) budget *= 0.78;
     if (s.cryptid.hp < 35) budget *= 0.58;
@@ -268,7 +289,7 @@
       const target = nearestEnemy(s, s.player, s.player.range);
       if (target) {
         const a = angleTo(s.player, target);
-        s.bullets.push({ x: s.player.x, y: s.player.y, vx: Math.cos(a) * 390, vy: Math.sin(a) * 390, r: 5, damage: s.player.damage, life: 1.2, pierce: s.player.pierce, color: s.player.color, owner: "player" });
+        firePlayerShot(s, a);
         s.player.fire = s.player.fireRate;
       } else {
         s.player.fire = 0.08;
@@ -282,6 +303,21 @@
         if (Math.hypot(e.x - ox, e.y - oy) < e.r + 9) {
           e.hp -= 18 * dt;
         }
+      }
+    }
+  }
+
+  function firePlayerShot(s, a) {
+    const piercePenalty = clamp(1 - s.player.pierce * 0.05, 0.72, 1);
+    const baseDamage = s.player.damage * piercePenalty;
+    s.bullets.push({ x: s.player.x, y: s.player.y, vx: Math.cos(a) * 400, vy: Math.sin(a) * 400, r: 5, damage: baseDamage, life: 1.22, pierce: s.player.pierce, color: s.player.color, owner: "player" });
+    if (s.player.shotgun > 0) {
+      const pellets = Math.min(2 + s.player.shotgun * 2, 8);
+      const spread = Math.min(0.32 + s.player.shotgun * 0.06, 0.62);
+      for (let i = 0; i < pellets; i++) {
+        const t = pellets === 1 ? 0 : i / (pellets - 1);
+        const aa = a - spread / 2 + spread * t;
+        s.bullets.push({ x: s.player.x, y: s.player.y, vx: Math.cos(aa) * 340, vy: Math.sin(aa) * 340, r: 4, damage: 6 + s.player.shotgun * 1.2, life: 0.78, pierce: 0, color: "#ffd166", owner: "player" });
       }
     }
   }
@@ -367,6 +403,7 @@
     const def = enemyDefs[e.type];
     s.kills++;
     s.score += def.score;
+    s.stats.enemyScore += def.score;
     s.gems.push({ x: e.x, y: e.y, r: 6, value: def.cost >= 5 ? 4 : 2, life: 20 });
     s.floaters.push({ x: e.x, y: e.y, text: `+${def.score}`, life: 0.8, color: "#ffd166" });
     if (def.split) {
@@ -399,6 +436,8 @@
       if (d < s.player.r + 9) {
         s.ce += g.value;
         s.score += g.value * 5;
+        s.stats.ceScore += g.value * 5;
+        s.stats.ceCollected += g.value;
         if (s.player.ceBurst > 0) {
           for (const e of s.enemies) if (Math.hypot(e.x - g.x, e.y - g.y) < 80) e.hp -= s.player.ceBurst;
         }
@@ -425,6 +464,7 @@
     const ids = new Set();
     if (s.cryptid.hp < 55) ids.add("heal");
     if (s.enemies.length > 24) ids.add("orbit");
+    if (s.enemies.length > 18) ids.add("shotgun");
     if (s.enemies.some(e => e.type === "archer")) ids.add("range");
     if (s.cryptid.hp < 35) ids.add("shield");
     const all = Object.keys(upgrades);
@@ -444,8 +484,10 @@
       btn.innerHTML = `<b>${u.name}</b><small>${u.desc}</small>`;
       btn.addEventListener("click", () => {
         u.apply(state);
+        state.upgradeCounts[id] = (state.upgradeCounts[id] || 0) + 1;
+        state.stats.upgrades++;
         state.ce -= state.ceNeed;
-        state.ceNeed = Math.floor(state.ceNeed * 1.18 + 3);
+        state.ceNeed = Math.floor(state.ceNeed * 1.15 + 3);
         pausedForUpgrade = false;
         screens.upgrade.classList.remove("active");
         mode = "game";
@@ -469,18 +511,30 @@
   function endGame(win) {
     if (!state || state.ended) return;
     state.ended = true;
-    const finalScore = Math.floor(state.score + (win ? 900 : 0) + Math.max(0, state.cryptid.hp) * 12 + state.kills * 3);
+    state.stats.clearBonus = win ? 900 : 0;
+    state.stats.hpBonus = Math.floor(Math.max(0, state.cryptid.hp) * 12);
+    state.stats.killBonus = state.kills * 3;
+    const finalScore = Math.floor(state.score + state.stats.clearBonus + state.stats.hpBonus + state.stats.killBonus);
     const saved = loadSave();
     saved.plays = (saved.plays || 0) + 1;
     saved.best = Math.max(saved.best || 0, finalScore);
     save(saved);
     ui.resultTitle.textContent = win ? "防衛成功" : "防衛失敗";
     ui.resultSummary.textContent = win ? "クリプタイドを守り切りました。" : "クリプタイドが倒されました。次は危険な敵を早めに処理してください。";
+    const build = Object.entries(state.upgradeCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([id, n]) => `${upgrades[id].name}-${n}`)
+      .join(" / ") || "なし";
     ui.resultStats.innerHTML = `
       <div><b>スコア</b>${finalScore}</div>
-      <div><b>討伐数</b>${state.kills}</div>
-      <div><b>残りHP</b>${Math.ceil(state.cryptid.hp)}%</div>
       <div><b>最高スコア</b>${saved.best}</div>
+      <div><b>討伐数</b>${state.kills}</div>
+      <div><b>回収CE</b>${state.stats.ceCollected}</div>
+      <div><b>撃破点</b>${state.stats.enemyScore}</div>
+      <div><b>CE点</b>${state.stats.ceScore}</div>
+      <div><b>防衛点</b>${state.stats.clearBonus + state.stats.hpBonus}</div>
+      <div><b>ビルド</b>${build}</div>
+      <div class="wide"><b>共有用</b>Score ${finalScore} / ${build}</div>
     `;
     updateBestText();
     setScreen("result");
@@ -574,6 +628,7 @@
   });
   document.getElementById("startBtn").addEventListener("click", newGame);
   document.getElementById("howBtn").addEventListener("click", () => setScreen("how"));
+  if (ui.stickSideBtn) ui.stickSideBtn.addEventListener("click", toggleStickSide);
   document.getElementById("backBtn").addEventListener("click", () => setScreen("start"));
   document.getElementById("retryBtn").addEventListener("click", newGame);
   document.getElementById("titleBtn").addEventListener("click", () => { updateBestText(); setScreen("start"); });
