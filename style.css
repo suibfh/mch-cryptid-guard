@@ -351,3 +351,11 @@ body.stick-right #pauseBtn { left: calc(var(--game-left, 0px) + 22px); }
   #startScreen .hero-img { width: 32px; height: 32px; }
   #startScreen .hero-card small { display: none; }
 }
+
+/* v5.7: guaranteed confetti overlay for GoldChest fallback */
+.local-confetti {
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  pointer-events: none;
+}

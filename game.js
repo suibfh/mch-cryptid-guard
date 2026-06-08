@@ -683,7 +683,7 @@
     for (const [id, evo] of Object.entries(evolutionDefs)) {
       if (!s.evolutions[id] && evo.condition(s)) {
         s.evolutions[id] = true;
-        const text = `EVOLUTION! ${evo.name}`;
+        const text = `覚醒! ${evo.name}`;
         s.evolutionBanner = { text, life: 2.2 };
         s.floaters.push({ x: W / 2, y: 92, text, life: 2.0, color: "#ffd166" });
       }
@@ -790,7 +790,7 @@
     const level = `<span class="level-pill">Lv${current} → Lv${next}</span>`;
     let evoHtml = "";
     if (will) {
-      evoHtml = `<div class="evo-box ready">${will.asset ? `<img src="${will.asset}" alt="${will.name}" onerror="this.style.display='none'" draggable="false">` : ""}<div><b>進化確定</b><span>${will.name}</span><small>条件: ${will.conditionLine}</small></div></div>`;
+      evoHtml = `<div class="evo-box ready">${will.asset ? `<img src="${will.asset}" alt="${will.name}" onerror="this.style.display='none'" draggable="false">` : ""}<div><b>覚醒確定</b><span>${will.name}</span><small>条件: ${will.conditionLine}</small></div></div>`;
     } else if (best) {
       evoHtml = `<div class="evo-box"><div><b>${best.name}まで ${best.afterTotal}/${best.totalNeed}</b><span>条件: ${best.conditionLine}</span><small>現在: ${best.currentLine}</small></div></div>`;
     }
@@ -819,9 +819,9 @@
       const will = evolutionProgressForUpgrade(s, id).find(p => p.willEvolve);
       if (will) readyNames.push(`${upgrades[id].name}で${will.name}`);
     }
-    if (readyNames.length) return `進化間近: ${readyNames.slice(0, 2).join(" / ")}`;
-    if (near.length) return `進化に近いエクステンションを候補に含めています。Lv表示と必要素材を見て選べます。`;
-    return s.cryptid.hp < 45 ? "ヨシュカが危険です。守りを厚くする候補を含めています。" : "エクステンションを選ぶとLvが上がります。組み合わせ条件を満たすと上位エクステへ進化します。";
+    if (readyNames.length) return `覚醒間近: ${readyNames.slice(0, 2).join(" / ")}`;
+    if (near.length) return `覚醒に近いエクステンションを候補に含めています。Lv表示と必要素材を見て選べます。`;
+    return s.cryptid.hp < 45 ? "ヨシュカが危険です。守りを厚くする候補を含めています。" : "エクステンションを選ぶとLvが上がります。組み合わせ条件を満たすと上位エクステが覚醒します。";
   }
 
   function openUpgrade() {
@@ -860,7 +860,7 @@
     saved.best = Math.max(saved.best || 0, finalScore);
     save(saved);
     ui.resultTitle.textContent = state.t >= state.duration ? "スコア確定" : "防衛失敗";
-    ui.resultSummary.textContent = state.t >= state.duration ? "ヨシュカを3分守り切り、鬼TIMEで稼いだ最終結果です。" : "ヨシュカが倒されました。次は危険な敵を早めに処理してください。";
+    ui.resultSummary.textContent = state.t >= state.duration ? "ヨシュカを3分守り切りました。鬼TIMEボーナス！" : "ヨシュカが倒されました。次は危険な敵を早めに処理してください。";
     const build = buildText(state);
     ui.resultStats.innerHTML = `
       <div><b>スコア</b>${finalScore}</div>
@@ -889,14 +889,73 @@
   function showGoldChest() {
     const panel = screens.result;
     if (panel) panel.classList.remove("fallback-gold");
+    let modalShown = false;
     const modal = window.GoldChestModal;
     if (modal && typeof modal.show === "function") {
-      try { modal.show(); return; } catch (err) { console.warn("GoldChestModal.show() failed. Using fallback effect.", err); }
+      try {
+        modal.show();
+        modalShown = true;
+      } catch (err) {
+        console.warn("GoldChestModal.show() failed. Using fallback effect.", err);
+      }
     }
-    if (panel) {
+    // GoldChestModal.show() should include confetti according to the GoldChest quick start.
+    // Some environments show the chest but fail to render the bundled confetti canvas,
+    // so we also fire a small local confetti burst to guarantee feedback.
+    launchLocalConfetti();
+    if (!modalShown && panel) {
       panel.classList.add("fallback-gold");
       window.setTimeout(() => panel.classList.remove("fallback-gold"), 1300);
     }
+  }
+
+  function launchLocalConfetti() {
+    const canvas = document.createElement("canvas");
+    canvas.className = "local-confetti";
+    canvas.width = window.innerWidth * window.devicePixelRatio;
+    canvas.height = window.innerHeight * window.devicePixelRatio;
+    canvas.style.width = "100vw";
+    canvas.style.height = "100vh";
+    document.body.appendChild(canvas);
+    const dpr = window.devicePixelRatio || 1;
+    const c = canvas.getContext("2d");
+    c.scale(dpr, dpr);
+    const colors = ["#1e90ff", "#6b8e23", "#ffd700", "#ff69b4", "#ff4500", "#00ced1", "#9370db", "#fff176"];
+    const count = 120;
+    const parts = Array.from({ length: count }, (_, i) => ({
+      x: window.innerWidth * (0.12 + Math.random() * 0.76),
+      y: -20 - Math.random() * 120,
+      vx: (Math.random() - 0.5) * 5.5,
+      vy: 2.0 + Math.random() * 4.2,
+      rot: Math.random() * Math.PI,
+      vr: (Math.random() - 0.5) * 0.28,
+      w: 5 + Math.random() * 7,
+      h: 10 + Math.random() * 10,
+      color: colors[i % colors.length],
+      life: 1
+    }));
+    let start = performance.now();
+    function frame(now) {
+      const t = (now - start) / 1000;
+      c.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      for (const p of parts) {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.035;
+        p.rot += p.vr;
+        p.life = Math.max(0, 1 - t / 2.1);
+        c.save();
+        c.globalAlpha = p.life;
+        c.translate(p.x, p.y);
+        c.rotate(p.rot);
+        c.fillStyle = p.color;
+        c.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        c.restore();
+      }
+      if (t < 2.2) requestAnimationFrame(frame);
+      else canvas.remove();
+    }
+    requestAnimationFrame(frame);
   }
 
   function draw() {
