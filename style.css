@@ -399,3 +399,30 @@ p { color: var(--muted); line-height: 1.7; }
 .audio-panel, .audio-panel * { -webkit-user-select: auto; user-select: auto; -webkit-touch-callout: default; }
 .audio-panel input[type=range] { touch-action: pan-x !important; -webkit-user-select: auto; user-select: auto; accent-color: #83d6ff; }
 .audio-panel button, #audioBtn { touch-action: manipulation !important; }
+
+/* v6.10 leaderboard */
+#startScreen .actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 680px) {
+  #startScreen .actions { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  #startScreen .actions button { padding: 8px 6px; font-size: 11px; }
+}
+.leaderboard-panel { width: min(640px, 94vw); max-height: 88dvh; overflow: auto; }
+.leaderboard-list, .leaderboard-mini { margin-top: 10px; }
+.leaderboard-table { width: 100%; border-collapse: collapse; overflow: hidden; border-radius: 6px; border: 1px solid var(--line); background: rgba(255,255,255,0.035); }
+.leaderboard-table th, .leaderboard-table td { padding: 9px 8px; border-bottom: 1px solid rgba(255,255,255,0.08); text-align: left; font-size: 13px; }
+.leaderboard-table th { color: var(--muted); font-size: 11px; letter-spacing: .08em; }
+.leaderboard-table td:first-child, .leaderboard-table th:first-child { width: 42px; text-align: center; }
+.leaderboard-table td:nth-child(3), .leaderboard-table th:nth-child(3) { text-align: right; }
+.ranking-submit { margin-top: 14px; padding: 12px; border: 1px solid var(--line); border-radius: 6px; background: rgba(255,255,255,0.04); }
+.ranking-submit h3 { margin: 0 0 8px; font-size: 15px; }
+.ranking-form { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.ranking-form input { min-width: 0; border: 1px solid var(--line); border-radius: 6px; padding: 9px 10px; color: var(--text); background: rgba(0,0,0,0.24); font: inherit; }
+.ranking-form button:disabled { opacity: .55; cursor: wait; }
+.ranking-message { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+.ranking-message.error { color: #ff9a9a; }
+@media (max-width: 640px) {
+  .leaderboard-table th, .leaderboard-table td { padding: 7px 5px; font-size: 11px; }
+  .leaderboard-table th { font-size: 9px; }
+  .ranking-submit { padding: 9px; }
+  .ranking-form { grid-template-columns: 1fr; }
+}

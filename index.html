@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>MCH Yoshka Guard - Test v6.7</title>
+  <title>MCH Yoshka Guard - Test v6.10</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -44,6 +44,7 @@
       <div class="actions">
         <button id="startBtn" class="primary">開始</button>
         <button id="howBtn" class="secondary">遊び方</button>
+        <button id="leaderboardBtn" class="secondary">ランキング</button>
       </div>
       <div id="bestScore" class="score-line"></div>
     </section>
@@ -86,10 +87,26 @@
       <h2 id="resultTitle">結果</h2>
       <p id="resultSummary"></p>
       <div id="resultStats" class="result-stats"></div>
+      <div id="rankingSubmit" class="ranking-submit">
+        <h3>ランキング登録</h3>
+        <div class="ranking-form">
+          <input id="playerNameInput" maxlength="12" placeholder="名前 12文字まで" autocomplete="nickname" />
+          <button id="submitScoreBtn" class="primary">登録</button>
+        </div>
+        <p id="rankingMessage" class="ranking-message"></p>
+        <div id="resultLeaderboard" class="leaderboard-mini"></div>
+      </div>
       <div class="actions">
         <button id="retryBtn" class="primary">もう一度</button>
         <button id="titleBtn" class="secondary">タイトルへ</button>
       </div>
+    </section>
+
+    <section id="leaderboardScreen" class="panel screen leaderboard-panel">
+      <h2>ランキング</h2>
+      <p>上位10件を表示します。</p>
+      <div id="leaderboardList" class="leaderboard-list"><p class="ranking-message">読み込み中...</p></div>
+      <div class="actions"><button id="leaderboardBackBtn" class="secondary">戻る</button></div>
     </section>
   </main>
   <script src="Data/Effects/GoldChest/src/confetti.js"></script>

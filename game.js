@@ -2,6 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "mch_yoshka_guard_test_v5";
+  const PLAYER_NAME_KEY = "mch_yoshka_guard_player_name";
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
 
@@ -11,6 +12,7 @@
     game: document.getElementById("gameScreen"),
     upgrade: document.getElementById("upgradeScreen"),
     result: document.getElementById("resultScreen"),
+    leaderboard: document.getElementById("leaderboardScreen"),
   };
 
   const ui = {
@@ -34,6 +36,13 @@
     bgmVolume: document.getElementById("bgmVolume"),
     seVolume: document.getElementById("seVolume"),
     muteBtn: document.getElementById("muteBtn"),
+    leaderboardBtn: document.getElementById("leaderboardBtn"),
+    leaderboardBackBtn: document.getElementById("leaderboardBackBtn"),
+    leaderboardList: document.getElementById("leaderboardList"),
+    resultLeaderboard: document.getElementById("resultLeaderboard"),
+    playerNameInput: document.getElementById("playerNameInput"),
+    submitScoreBtn: document.getElementById("submitScoreBtn"),
+    rankingMessage: document.getElementById("rankingMessage"),
   };
 
   const W = 960;
@@ -46,6 +55,7 @@
   let mode = "start";
   let pausedForUpgrade = false;
   let audioPanelPausedGame = false;
+  let lastResult = null;
 
   const rand = (a, b) => a + Math.random() * (b - a);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -1135,6 +1145,87 @@
     ui.score.textContent = `${Math.floor(s.score)}`;
   }
 
+
+  function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>\"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[ch]));
+  }
+
+  function normalizePlayerName(name) {
+    return String(name || "").trim().slice(0, 12);
+  }
+
+  function setRankingMessage(text, isError = false) {
+    if (!ui.rankingMessage) return;
+    ui.rankingMessage.textContent = text || "";
+    ui.rankingMessage.classList.toggle("error", !!isError);
+  }
+
+  function renderLeaderboard(rows, target) {
+    if (!target) return;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      target.innerHTML = '<p class="ranking-message">まだランキングがありません。</p>';
+      return;
+    }
+    const body = rows.slice(0, 10).map((r, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${escapeHtml(r.player_name)}</td>
+        <td>${Number(r.score || 0).toLocaleString()}</td>
+        <td>${escapeHtml(r.hero_name)}</td>
+      </tr>`).join("");
+    target.innerHTML = `
+      <table class="leaderboard-table">
+        <thead><tr><th>順位</th><th>名前</th><th>スコア</th><th>ヒーロー</th></tr></thead>
+        <tbody>${body}</tbody>
+      </table>`;
+  }
+
+  async function fetchLeaderboard(target = ui.leaderboardList) {
+    if (target) target.innerHTML = '<p class="ranking-message">読み込み中...</p>';
+    try {
+      const res = await fetch('/api/leaderboard', { cache: 'no-store' });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) throw new Error(json.error || 'ランキングを取得できませんでした。');
+      renderLeaderboard(json.rows || [], target);
+      return json.rows || [];
+    } catch (err) {
+      if (target) target.innerHTML = `<p class="ranking-message error">ランキングを取得できませんでした。Vercel公開後に確認してください。</p>`;
+      return [];
+    }
+  }
+
+  async function submitScoreToLeaderboard() {
+    if (!lastResult) return;
+    const name = normalizePlayerName(ui.playerNameInput?.value);
+    if (!name) { setRankingMessage('名前を入力してください。', true); return; }
+    localStorage.setItem(PLAYER_NAME_KEY, name);
+    setRankingMessage('登録中...');
+    if (ui.submitScoreBtn) ui.submitScoreBtn.disabled = true;
+    try {
+      const res = await fetch('/api/submit-score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, score: lastResult.score, hero: lastResult.hero })
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) throw new Error(json.error || '登録できませんでした。');
+      setRankingMessage('登録しました。');
+      renderLeaderboard(json.rows || [], ui.resultLeaderboard);
+    } catch (err) {
+      setRankingMessage('登録できませんでした。Vercel公開後に確認してください。', true);
+    } finally {
+      if (ui.submitScoreBtn) ui.submitScoreBtn.disabled = false;
+    }
+  }
+
+  function prepareRankingSubmit(finalScore) {
+    lastResult = { score: finalScore, hero: heroDefs[selectedHero].name };
+    if (ui.playerNameInput) ui.playerNameInput.value = localStorage.getItem(PLAYER_NAME_KEY) || "";
+    if (ui.resultLeaderboard) ui.resultLeaderboard.innerHTML = '';
+    setRankingMessage('');
+    fetchLeaderboard(ui.resultLeaderboard);
+  }
+
   function endGame(win) {
     if (!state || state.ended) return;
     state.ended = true;
@@ -1162,6 +1253,7 @@
       <div class="wide build-box"><b>ビルド</b>${buildIconsHtml(state)}</div>
     `;
     updateBestText();
+    prepareRankingSubmit(finalScore);
     setScreen("result");
     playBgm(state.t >= state.duration ? "win" : "lose", false);
     if (state.t >= state.duration) triggerGoldChestEffect();
@@ -1437,6 +1529,10 @@
   });
   document.getElementById("startBtn").addEventListener("click", e => { unlockAudio(); newGame(); });
   document.getElementById("howBtn").addEventListener("click", () => setScreen("how"));
+  if (ui.leaderboardBtn) ui.leaderboardBtn.addEventListener("click", () => { setScreen("leaderboard"); fetchLeaderboard(ui.leaderboardList); });
+  if (ui.leaderboardBackBtn) ui.leaderboardBackBtn.addEventListener("click", () => setScreen("start"));
+  if (ui.submitScoreBtn) ui.submitScoreBtn.addEventListener("click", submitScoreToLeaderboard);
+  if (ui.playerNameInput) ui.playerNameInput.addEventListener("keydown", e => { if (e.key === "Enter") submitScoreToLeaderboard(); });
   document.getElementById("backBtn").addEventListener("click", () => setScreen("start"));
   document.getElementById("retryBtn").addEventListener("click", () => { unlockAudio(); newGame(); });
   document.getElementById("titleBtn").addEventListener("click", () => { stopAllBgm(); updateBestText(); setScreen("start"); });
