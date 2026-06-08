@@ -150,8 +150,8 @@
   const heroDefs = {
     balanced: { name: "グリム兄弟", asset: assetPaths.heroes.balanced, icon: "⚔", speed: 210, range: 165, fireRate: 0.68, damage: 14, color: "#83d6ff", magnet: 100 },
     swift: { name: "ジャックザリッパー", asset: assetPaths.heroes.swift, icon: "✦", speed: 252, range: 145, fireRate: 0.62, damage: 11, color: "#91f0aa", magnet: 130 },
-    guardian: { name: "スパルタクス", asset: assetPaths.heroes.guardian, icon: "◆", speed: 182, range: 150, fireRate: 0.78, damage: 13, color: "#ffd166", magnet: 92, aura: true },
-    sage: { name: "ライト兄弟", asset: assetPaths.heroes.sage, icon: "☄", speed: 192, range: 215, fireRate: 0.88, damage: 18, color: "#c8a2ff", magnet: 98 },
+    guardian: { name: "スパルタクス", asset: assetPaths.heroes.guardian, icon: "◆", speed: 182, range: 150, fireRate: 0.78, damage: 16, color: "#ffd166", magnet: 92, aura: true },
+    sage: { name: "ライト兄弟", asset: assetPaths.heroes.sage, icon: "☄", speed: 192, range: 215, fireRate: 0.88, damage: 23, color: "#c8a2ff", magnet: 98 },
   };
 
   const enemyDefs = {
@@ -254,7 +254,7 @@
       evolutions: {},
       evolutionBanner: null,
       stick: { active: false, x: 0, y: 0 },
-      player: { x: W / 2, y: H / 2 + 118, r: 14, ...base, fire: 0, orbits: base.aura ? 1 : 0, pierce: 0, ceBurst: 0, shotgun: 0 },
+      player: { x: W / 2, y: H / 2 + 118, r: 14, ...base, baseRange: base.range, fire: 0, orbits: base.aura ? 1 : 0, pierce: 0, ceBurst: 0, shotgun: 0 },
       cryptid: { name: "ヨシュカ", oniName: "ヨシュカ チョコラート", x: W / 2, y: H / 2, r: 34, hp: 100, maxHp: 100, wall: 0, slow: 0, shields: 1, hitFlash: 0 },
       paused: false,
       ended: false,
@@ -453,6 +453,12 @@
     return s.cryptid.wall + (s.evolutions.sanctuary ? 2 : 0);
   }
 
+  function effectivePlayerOrbitRadius(s) {
+    const rangeGain = Math.max(0, (s.player.range || 0) - (s.player.baseRange || s.player.range || 0));
+    const evolvedBonus = s.evolutions.whirlOrbit ? 6 : 0;
+    return 42 + Math.min(30, rangeGain * 0.18) + evolvedBonus;
+  }
+
   function updatePlayerFire(s, dt) {
     s.player.fire -= dt;
     if (s.player.fire <= 0) {
@@ -467,13 +473,14 @@
     }
     const orbitCount = effectiveOrbitCount(s);
     const orbitSpeed = s.evolutions.whirlOrbit ? 2.75 : 1.85;
+    const orbitRadius = effectivePlayerOrbitRadius(s);
     const orbitDamage = s.evolutions.whirlOrbit ? 10 : 7;
     const orbitCooldown = s.evolutions.whirlOrbit ? 0.22 : 0.28;
     const orbitHitRange = s.evolutions.whirlOrbit ? 17 : 14;
     for (let i = 0; i < orbitCount; i++) {
       const a = s.t * (orbitSpeed + i * 0.12) + (Math.PI * 2 * i) / Math.max(1, orbitCount);
-      const ox = s.player.x + Math.cos(a) * 42;
-      const oy = s.player.y + Math.sin(a) * 42;
+      const ox = s.player.x + Math.cos(a) * orbitRadius;
+      const oy = s.player.y + Math.sin(a) * orbitRadius;
       for (const e of s.enemies) {
         const key = `orbit${i}`;
         if (Math.hypot(e.x - ox, e.y - oy) < e.r + orbitHitRange && canHit(e, key, s.t, orbitCooldown)) {
@@ -488,7 +495,8 @@
   function firePlayerShot(s, a) {
     const piercePenalty = clamp(1 - s.player.pierce * 0.05, 0.72, 1);
     const baseDamage = s.player.damage * piercePenalty;
-    s.bullets.push({ x: s.player.x, y: s.player.y, vx: Math.cos(a) * 400, vy: Math.sin(a) * 400, r: 5, damage: baseDamage, life: 1.22, pierce: s.player.pierce, color: s.player.color, owner: "player" });
+    const mainColor = s.evolutions.pierceShotgun ? "#ff5fa2" : (s.player.pierce >= 3 ? "#ff9f43" : s.player.color);
+    s.bullets.push({ x: s.player.x, y: s.player.y, vx: Math.cos(a) * 400, vy: Math.sin(a) * 400, r: s.evolutions.pierceShotgun ? 6 : 5, damage: baseDamage, life: 1.22, pierce: s.player.pierce, color: mainColor, owner: "player", glow: !!s.evolutions.pierceShotgun });
     if (s.player.shotgun > 0) {
       let pellets = Math.min(2 + s.player.shotgun * 2, 8);
       let spread = Math.min(0.32 + s.player.shotgun * 0.06, 0.62);
@@ -508,12 +516,12 @@
       if (s.evolutions.pierceShotgun) {
         pelletPierce = 1;
         pelletDamage *= 0.9;
-        pelletColor = "#ffdf7e";
+        pelletColor = s.evolutions.holyShot ? "#ff5fa2" : "#ff6b6b";
       }
       for (let i = 0; i < pellets; i++) {
         const t = pellets === 1 ? 0 : i / (pellets - 1);
         const aa = a - spread / 2 + spread * t;
-        s.bullets.push({ x: s.player.x, y: s.player.y, vx: Math.cos(aa) * pelletSpeed, vy: Math.sin(aa) * pelletSpeed, r: 4, damage: pelletDamage, life: pelletLife, pierce: pelletPierce, color: pelletColor, owner: "player" });
+        s.bullets.push({ x: s.player.x, y: s.player.y, vx: Math.cos(aa) * pelletSpeed, vy: Math.sin(aa) * pelletSpeed, r: s.evolutions.pierceShotgun ? 5 : 4, damage: pelletDamage, life: pelletLife, pierce: pelletPierce, color: pelletColor, owner: "player", glow: s.evolutions.holyShot || s.evolutions.pierceShotgun });
       }
     }
   }
@@ -700,6 +708,23 @@
     return [...evos, ...base].join(" / ") || "なし";
   }
 
+  function iconHtml(asset, name, label, cls="") {
+    const img = asset ? `<img src="${asset}" alt="${name}" onerror="this.style.display='none'" draggable="false">` : "";
+    return `<span class="build-icon ${cls}" title="${name}">${img}<em>${label}</em><small>${name}</small></span>`;
+  }
+
+  function buildIconsHtml(s) {
+    const evos = Object.entries(s.evolutions || {})
+      .filter(([, v]) => v)
+      .map(([id]) => iconHtml(evolutionDefs[id].asset, evolutionDefs[id].name, "覚醒", "awakened"));
+    const base = Object.entries(s.upgradeCounts || {})
+      .filter(([, n]) => n > 0)
+      .sort((a, b) => b[1] - a[1])
+      .map(([id, n]) => iconHtml(upgrades[id].asset, upgrades[id].name, `Lv${n}`));
+    const html = [...evos, ...base].join("");
+    return html ? `<div class="build-icons">${html}</div>` : "なし";
+  }
+
   function evolutionProgressForUpgrade(s, upgradeId) {
     const after = { ...(s.upgradeCounts || {}) };
     after[upgradeId] = (after[upgradeId] || 0) + 1;
@@ -859,7 +884,7 @@
     saved.plays = (saved.plays || 0) + 1;
     saved.best = Math.max(saved.best || 0, finalScore);
     save(saved);
-    ui.resultTitle.textContent = state.t >= state.duration ? "スコア確定" : "防衛失敗";
+    ui.resultTitle.textContent = state.t >= state.duration ? "リザルト" : "防衛失敗";
     ui.resultSummary.textContent = state.t >= state.duration ? "ヨシュカを3分守り切りました。鬼TIMEボーナス！" : "ヨシュカが倒されました。次は危険な敵を早めに処理してください。";
     const build = buildText(state);
     ui.resultStats.innerHTML = `
@@ -870,10 +895,9 @@
       <div><b>撃破点</b>${state.stats.enemyScore}</div>
       <div><b>CE点</b>${state.stats.ceScore}</div>
       <div><b>防衛点</b>${state.stats.clearBonus + state.stats.hpBonus}</div>
-      <div><b>鬼TIME加点</b>${state.stats.oniBonus}</div>
+      <div><b>鬼TIMEボーナス</b>${state.stats.oniBonus}</div>
       <div><b>到達時間</b>${Math.floor(state.t)}秒</div>
-      <div><b>ビルド</b>${build}</div>
-      <div class="wide"><b>共有用</b>Score ${finalScore} / ${build}</div>
+      <div class="wide build-box"><b>ビルド</b>${buildIconsHtml(state)}</div>
     `;
     updateBestText();
     setScreen("result");
@@ -1044,9 +1068,9 @@
       const x = c.x + Math.cos(a) * 56;
       const y = c.y + Math.sin(a) * 56;
       ctx.save();
-      ctx.shadowColor = s.evolutions.sanctuary ? "#b8f7ff" : "#83d6ff";
-      ctx.shadowBlur = 12;
-      circle(x, y, 8, s.evolutions.sanctuary ? "#b8f7ff" : "#83d6ff");
+      ctx.shadowColor = s.evolutions.sanctuary ? "#d8b4fe" : "#83d6ff";
+      ctx.shadowBlur = s.evolutions.sanctuary ? 16 : 12;
+      circle(x, y, s.evolutions.sanctuary ? 9 : 8, s.evolutions.sanctuary ? "#d8b4fe" : "#83d6ff");
       ctx.restore();
     }
 
@@ -1072,7 +1096,14 @@
     }
     ctx.globalAlpha = 0.12; circle(p.x, p.y, p.range, p.color); ctx.globalAlpha = 1;
     const orbitCount = effectiveOrbitCount(s);
-    for (let i = 0; i < orbitCount; i++) { const a = s.t*((s.evolutions.whirlOrbit ? 2.75 : 1.85)+i*0.12)+(Math.PI*2*i)/Math.max(1,orbitCount); circle(p.x+Math.cos(a)*42, p.y+Math.sin(a)*42, 7, s.evolutions.whirlOrbit ? "#ffe8a3" : "#ffd166"); }
+    const orbitRadius = effectivePlayerOrbitRadius(s);
+    for (let i = 0; i < orbitCount; i++) {
+      const a = s.t*((s.evolutions.whirlOrbit ? 2.75 : 1.85)+i*0.12)+(Math.PI*2*i)/Math.max(1,orbitCount);
+      ctx.save();
+      if (s.evolutions.whirlOrbit) { ctx.shadowColor = "#66f7ff"; ctx.shadowBlur = 12; }
+      circle(p.x+Math.cos(a)*orbitRadius, p.y+Math.sin(a)*orbitRadius, s.evolutions.whirlOrbit ? 8 : 7, s.evolutions.whirlOrbit ? "#66f7ff" : "#ffd166");
+      ctx.restore();
+    }
     ctx.restore();
   }
   function drawEnemy(e) {
@@ -1087,7 +1118,13 @@
     ctx.fillStyle = "#91f0aa"; ctx.fillRect(e.x - w/2, e.y - e.r - 10, w * clamp(e.hp / e.maxHp, 0, 1), 4);
     ctx.restore();
   }
-  function drawBullet(b) { circle(b.x, b.y, b.r, b.color); }
+  function drawBullet(b) {
+    ctx.save();
+    if (b.glow) { ctx.shadowColor = b.color; ctx.shadowBlur = 12; }
+    circle(b.x, b.y, b.r, b.color);
+    if (b.glow) { ctx.globalAlpha = 0.35; circle(b.x, b.y, b.r + 4, b.color); }
+    ctx.restore();
+  }
   function drawGem(g) { circle(g.x, g.y, g.r + Math.sin(performance.now()/110)*1.2, "#5eead4"); }
   function drawWarning(w) {
     ctx.save(); ctx.globalAlpha = clamp(w.life, 0, 1); ctx.fillStyle = w.color; ctx.font = "bold 16px system-ui"; ctx.textAlign = "center"; ctx.fillText(w.text, w.x, w.y); ctx.restore();

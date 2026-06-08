@@ -368,3 +368,20 @@ body.stick-right #pauseBtn { left: calc(var(--game-left, 0px) + 22px); }
   pointer-events: none !important;
   position: fixed !important;
 }
+
+/* v5.9 result build icon UI */
+.result-stats .build-box { padding-bottom: 10px; }
+.build-icons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; align-items: center; }
+.build-icon { width: 58px; min-height: 66px; border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; background: rgba(255,255,255,0.045); display: grid; place-items: center; padding: 5px 4px 4px; position: relative; overflow: hidden; }
+.build-icon img { width: 32px; height: 32px; object-fit: contain; display: block; }
+.build-icon em { position: absolute; top: 3px; right: 3px; min-width: 24px; padding: 1px 4px; border-radius: 999px; background: rgba(0,0,0,0.72); color: #fff0a6; font-style: normal; font-size: 9px; font-weight: 900; line-height: 1.3; text-align: center; }
+.build-icon small { width: 100%; display: block; margin-top: 3px; color: rgba(255,255,255,0.78); font-size: 8px; line-height: 1.1; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.build-icon.awakened { border-color: rgba(255, 215, 102, 0.8); box-shadow: 0 0 14px rgba(255, 215, 102, 0.24); background: linear-gradient(160deg, rgba(255,215,102,0.17), rgba(255,255,255,0.04)); }
+.build-icon.awakened em { background: #ffe066; color: #261d00; }
+@media (max-width: 640px) {
+  .build-icons { gap: 6px; }
+  .build-icon { width: 50px; min-height: 60px; border-radius: 10px; }
+  .build-icon img { width: 28px; height: 28px; }
+  .build-icon small { font-size: 7px; }
+  .build-icon em { font-size: 8px; }
+}
