@@ -426,3 +426,94 @@ p { color: var(--muted); line-height: 1.7; }
   .ranking-submit { padding: 9px; }
   .ranking-form { grid-template-columns: 1fr; }
 }
+
+
+/* v6.11 slow field and cleaner result UI */
+.result-panel {
+  width: min(620px, 94vw);
+  max-height: 88dvh;
+}
+.result-panel h2 {
+  margin-bottom: 6px;
+}
+#resultSummary {
+  margin: 4px 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.result-stats {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+.result-stats div {
+  padding: 9px 10px;
+  border-radius: 6px;
+}
+.result-stats b {
+  margin-bottom: 3px;
+  font-size: 10px;
+  letter-spacing: .05em;
+}
+.result-score-main {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 2px 10px;
+  background: linear-gradient(135deg, rgba(131,214,255,.14), rgba(255,209,102,.08)) !important;
+  border-color: rgba(131,214,255,.30) !important;
+}
+.result-score-main b {
+  grid-column: 1 / -1;
+}
+.result-score-main strong {
+  font-size: 34px;
+  line-height: .95;
+  color: #fff0a6;
+  letter-spacing: .02em;
+}
+.result-score-main span {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.result-stats .build-box {
+  padding: 8px 10px 10px;
+}
+.build-icons {
+  gap: 6px;
+  margin-top: 6px;
+}
+.build-icon {
+  width: 50px;
+  min-height: 56px;
+}
+.build-icon img {
+  width: 28px;
+  height: 28px;
+}
+.ranking-submit {
+  margin-top: 10px;
+  padding: 10px;
+}
+.ranking-submit h3 {
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+.leaderboard-mini .leaderboard-table th,
+.leaderboard-mini .leaderboard-table td {
+  padding: 6px 5px;
+  font-size: 11px;
+}
+@media (max-width: 680px) {
+  .result-panel { width: 94vw; max-height: 88dvh; padding: 14px; }
+  .result-stats { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  .result-score-main strong { font-size: 28px; }
+  .result-score-main span { font-size: 11px; }
+  .result-stats div { padding: 8px; }
+  .result-stats b { font-size: 9px; }
+  .build-icon { width: 46px; min-height: 54px; }
+  .build-icon img { width: 26px; height: 26px; }
+  .ranking-submit { padding: 8px; margin-top: 8px; }
+}

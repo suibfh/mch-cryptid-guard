@@ -433,7 +433,7 @@
     haste: { name: "ブーツ", asset: assetPaths.upgrades.haste, desc: "移動速度とCE回収範囲が上がる。", apply: s => { s.player.speed += 28; s.player.magnet += 24; } },
     wall: { name: "シールドシステム", asset: assetPaths.upgrades.wall, desc: "ヨシュカの周囲に防衛弾を追加するエクステンション。", apply: s => s.cryptid.wall++ },
     heal: { name: "パンケーキ", asset: assetPaths.upgrades.heal, desc: "ヨシュカのHPを少し回復する。", apply: s => s.cryptid.hp = clamp(s.cryptid.hp + 22, 0, s.cryptid.maxHp) },
-    slow: { name: "籠罠", asset: assetPaths.upgrades.slow, desc: "ヨシュカ周辺の敵を遅くする。", apply: s => s.cryptid.slow += 0.08 },
+    slow: { name: "籠罠", asset: assetPaths.upgrades.slow, desc: "ヨシュカ周辺の敵をしっかり遅くする。", apply: s => s.cryptid.slow += 0.15 },
     pierce: { name: "ジャベリン", asset: assetPaths.upgrades.pierce, desc: "通常攻撃が1体貫通。弾の威力は少し下がるが密集に強い。", apply: s => s.player.pierce++ },
     shotgun: { name: "フレイル", asset: assetPaths.upgrades.shotgun, desc: "近距離へ扇形に追加弾を放つ。大量の敵を押し返しやすい。", apply: s => s.player.shotgun++ },
     burst: { name: "実はミサイル", asset: assetPaths.upgrades.burst, desc: "CE取得時、近くの敵に小ダメージ。", apply: s => s.player.ceBurst += 7 },
@@ -830,7 +830,8 @@
       const e = s.enemies[i];
       const def = enemyDefs[e.type];
       const dToC = Math.hypot(e.x - c.x, e.y - c.y);
-      const slow = dToC < 120 ? clamp(1 - c.slow, 0.55, 1) : 1;
+      const slowRange = s.evolutions.sanctuary ? 170 : 145;
+      const slow = dToC < slowRange ? clamp(1 - c.slow, 0.55, 1) : 1;
 
       if (def.ranged && dToC < def.range) {
         e.cd -= dt;
@@ -1239,17 +1240,14 @@
     save(saved);
     ui.resultTitle.textContent = state.t >= state.duration ? "リザルト" : "防衛失敗";
     ui.resultSummary.textContent = state.t >= state.duration ? "ヨシュカを3分守り切りました。鬼TIMEボーナス！" : "ヨシュカが倒されました。次は危険な敵を早めに処理してください。";
-    const build = buildText(state);
     ui.resultStats.innerHTML = `
-      <div><b>スコア</b>${finalScore}</div>
-      <div><b>最高スコア</b>${saved.best}</div>
+      <div class="result-score-main wide"><b>スコア</b><strong>${finalScore.toLocaleString()}</strong><span>最高 ${Number(saved.best || 0).toLocaleString()}</span></div>
       <div><b>討伐数</b>${state.kills}</div>
+      <div><b>到達時間</b>${Math.floor(state.t)}秒</div>
       <div><b>回収CE</b>${state.stats.ceCollected}</div>
-      <div><b>撃破点</b>${state.stats.enemyScore}</div>
-      <div><b>CE点</b>${state.stats.ceScore}</div>
       <div><b>防衛点</b>${state.stats.clearBonus + state.stats.hpBonus}</div>
       <div><b>鬼TIMEボーナス</b>${state.stats.oniBonus}</div>
-      <div><b>到達時間</b>${Math.floor(state.t)}秒</div>
+      <div><b>撃破/CE点</b>${state.stats.enemyScore} / ${state.stats.ceScore}</div>
       <div class="wide build-box"><b>ビルド</b>${buildIconsHtml(state)}</div>
     `;
     updateBestText();
@@ -1407,12 +1405,12 @@
     ctx.shadowBlur = 0;
     if (c.slow > 0) {
       ctx.globalAlpha = 0.12;
-      circle(c.x, c.y, 120, "#83d6ff");
+      circle(c.x, c.y, 145, "#83d6ff");
       ctx.globalAlpha = 1;
     }
     if (s.evolutions.sanctuary) {
       ctx.globalAlpha = 0.10;
-      circle(c.x, c.y, 124, "#b8f7ff");
+      circle(c.x, c.y, 170, "#b8f7ff");
       ctx.globalAlpha = 1;
     }
 
