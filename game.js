@@ -391,29 +391,16 @@
 
 
   function loadSave() {
-    try { return { best: 0, plays: 0, stickSide: "right", ...(JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}) }; }
-    catch { return { best: 0, plays: 0, stickSide: "right" }; }
+    try { return { best: 0, plays: 0, ...(JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}) }; }
+    catch { return { best: 0, plays: 0 }; }
   }
   function save(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
   function updateBestText() {
     const s = loadSave();
     ui.best.textContent = `最高スコア: ${s.best || 0} / プレイ回数: ${s.plays || 0}`;
-    applyStickSide(s.stickSide || "right");
   }
 
-  function applyStickSide(side) {
-    const chosen = side === "left" ? "left" : "right";
-    document.body.classList.toggle("stick-right", chosen === "right");
-    document.body.classList.toggle("stick-left", chosen === "left");
-    if (ui.stickSideBtn) ui.stickSideBtn.textContent = `操作パッド: ${chosen === "right" ? "右" : "左"}`;
-  }
-
-  function toggleStickSide() {
-    const saved = loadSave();
-    saved.stickSide = (saved.stickSide || "right") === "right" ? "left" : "right";
-    save(saved);
-    applyStickSide(saved.stickSide);
-  }
+  // スマホ操作は、ゲーム画面のどこでも使える仮想スティック方式です。
 
   const heroDefs = {
     balanced: { name: "グリム兄弟", asset: assetPaths.heroes.balanced, icon: "⚔", speed: 210, range: 165, fireRate: 0.68, damage: 14, color: "#83d6ff", magnet: 100 },
@@ -521,7 +508,7 @@
       upgradeCounts: {},
       evolutions: {},
       evolutionBanner: null,
-      stick: { active: false, x: 0, y: 0 },
+      stick: { active: false, x: 0, y: 0, baseX: 0, baseY: 0 },
       player: { x: W / 2, y: H / 2 + 118, r: 14, ...base, baseRange: base.range, fire: 0, orbits: base.aura ? 1 : 0, pierce: 0, ceBurst: 0, shotgun: 0 },
       cryptid: { name: "ヨシュカ", oniName: "ヨシュカ チョコラート", x: W / 2, y: H / 2, r: 34, hp: 100, maxHp: 100, wall: 0, slow: 0, shields: 1, hitFlash: 0 },
       paused: false,
@@ -1450,7 +1437,6 @@
   });
   document.getElementById("startBtn").addEventListener("click", e => { unlockAudio(); newGame(); });
   document.getElementById("howBtn").addEventListener("click", () => setScreen("how"));
-  if (ui.stickSideBtn) ui.stickSideBtn.addEventListener("click", toggleStickSide);
   document.getElementById("backBtn").addEventListener("click", () => setScreen("start"));
   document.getElementById("retryBtn").addEventListener("click", () => { unlockAudio(); newGame(); });
   document.getElementById("titleBtn").addEventListener("click", () => { stopAllBgm(); updateBestText(); setScreen("start"); });
@@ -1515,22 +1501,72 @@
   window.addEventListener("keyup", e => { if (state) state.keys[e.key] = false; });
 
   function setupStick() {
-    const stick = ui.stick, knob = ui.knob;
-    const reset = () => { if (!state) return; state.stick.active = false; state.stick.x = 0; state.stick.y = 0; knob.style.transform = "translate(0px,0px)"; };
-    stick.addEventListener("pointerdown", e => { e.preventDefault(); stick.setPointerCapture(e.pointerId); if (state) state.stick.active = true; updateStick(e); });
-    stick.addEventListener("pointermove", e => { e.preventDefault(); updateStick(e); });
-    stick.addEventListener("pointerup", e => { e.preventDefault(); reset(); });
-    stick.addEventListener("pointercancel", e => { e.preventDefault(); reset(); });
+    const stick = ui.stick, knob = ui.knob, area = ui.gameScreen;
+    let activePointerId = null;
+    const max = 42;
+
+    function isJoystickBlockedTarget(target) {
+      if (!target) return false;
+      return !!target.closest("button, .panel, .overlay, .audio-panel, #hud, #pauseBtn, #audioBtn");
+    }
+
+    function reset() {
+      if (!state) return;
+      state.stick.active = false;
+      state.stick.x = 0;
+      state.stick.y = 0;
+      activePointerId = null;
+      stick.classList.remove("active");
+      knob.style.transform = "translate(0px,0px)";
+    }
+
+    function placeStick(e) {
+      const r = stick.getBoundingClientRect();
+      stick.style.left = `${e.clientX - r.width / 2}px`;
+      stick.style.top = `${e.clientY - r.height / 2}px`;
+      knob.style.transform = "translate(0px,0px)";
+      state.stick.baseX = e.clientX;
+      state.stick.baseY = e.clientY;
+      stick.classList.add("active");
+    }
+
     function updateStick(e) {
       if (!state || !state.stick.active) return;
-      const r = stick.getBoundingClientRect();
-      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-      let dx = e.clientX - cx, dy = e.clientY - cy;
-      const len = Math.hypot(dx, dy), max = 34;
+      let dx = e.clientX - state.stick.baseX;
+      let dy = e.clientY - state.stick.baseY;
+      const len = Math.hypot(dx, dy);
       if (len > max) { dx = dx / len * max; dy = dy / len * max; }
-      state.stick.x = dx / max; state.stick.y = dy / max;
+      state.stick.x = dx / max;
+      state.stick.y = dy / max;
       knob.style.transform = `translate(${dx}px, ${dy}px)`;
     }
+
+    area.addEventListener("pointerdown", e => {
+      if (!state || mode !== "game" || state.paused || isJoystickBlockedTarget(e.target)) return;
+      e.preventDefault();
+      activePointerId = e.pointerId;
+      area.setPointerCapture?.(e.pointerId);
+      state.stick.active = true;
+      placeStick(e);
+    }, { passive: false });
+
+    area.addEventListener("pointermove", e => {
+      if (!state || !state.stick.active || e.pointerId !== activePointerId) return;
+      e.preventDefault();
+      updateStick(e);
+    }, { passive: false });
+
+    area.addEventListener("pointerup", e => {
+      if (e.pointerId !== activePointerId) return;
+      e.preventDefault();
+      reset();
+    }, { passive: false });
+
+    area.addEventListener("pointercancel", e => {
+      if (e.pointerId !== activePointerId) return;
+      e.preventDefault();
+      reset();
+    }, { passive: false });
   }
 
   syncAudioControls();
