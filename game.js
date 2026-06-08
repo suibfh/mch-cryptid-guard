@@ -28,6 +28,7 @@
     knob: document.getElementById("knob"),
     gameScreen: document.getElementById("gameScreen"),
     stickSideBtn: document.getElementById("stickSideBtn"),
+    goldChestBtn: document.getElementById("goldChestBtn"),
   };
 
   const W = 960;
@@ -147,18 +148,18 @@
   };
 
   const enemyDefs = {
-    walker: { name: "クリーパー ショート", oniName: "クリーパー トール ドッピオ", cost: 1, hp: 20, speed: 36, damage: 3, radius: 12, color: "#ff7979", score: 12 },
-    runner: { name: "クリーパー トール", oniName: "クリーパー グランデ ドッピオ", cost: 3, hp: 16, speed: 70, damage: 3, radius: 10, color: "#ffb86b", score: 18 },
-    archer: { name: "クリーパー グランデ", oniName: "クリーパー ヴェンティ ドッピオ", cost: 5, hp: 24, speed: 24, damage: 3, radius: 12, color: "#f78bd8", score: 28, ranged: true, range: 250, cooldown: 2.6 },
-    splitter: { name: "クリーパー ヴェンティ", oniName: "クリーパー フラペチーノ ドッピオ", cost: 6, hp: 38, speed: 30, damage: 4, radius: 15, color: "#a3e635", score: 35, split: true },
-    hexer: { name: "クリーパー マキアート", oniName: "ハートブリード フラペチーノ ドッピオ", cost: 7, hp: 30, speed: 31, damage: 2, radius: 13, color: "#b58cff", score: 42, debuff: true },
+    walker: { name: "クリーパー ショート", oniName: "クリーパー トール ドッピオ", cost: 1, hp: 20, speed: 36, damage: 3, radius: 12, color: "#ff7979", score: 12, oniScore: 36 },
+    runner: { name: "クリーパー トール", oniName: "クリーパー グランデ ドッピオ", cost: 3, hp: 16, speed: 70, damage: 3, radius: 10, color: "#ffb86b", score: 18, oniScore: 48 },
+    archer: { name: "クリーパー グランデ", oniName: "クリーパー ヴェンティ ドッピオ", cost: 5, hp: 24, speed: 24, damage: 3, radius: 12, color: "#f78bd8", score: 28, oniScore: 70, ranged: true, range: 250, cooldown: 2.6 },
+    splitter: { name: "クリーパー ヴェンティ", oniName: "クリーパー フラペチーノ ドッピオ", cost: 6, hp: 38, speed: 30, damage: 4, radius: 15, color: "#a3e635", score: 35, oniScore: 92, split: true },
+    hexer: { name: "クリーパー マキアート", oniName: "ハートブリード フラペチーノ ドッピオ", cost: 8, hp: 44, speed: 38, damage: 4, radius: 14, color: "#b58cff", score: 70, oniScore: 120, debuff: true },
   };
 
   const upgrades = {
-    orbit: { name: "チャクラム", asset: assetPaths.upgrades.orbit, desc: "周囲を回る弾を1つ追加。近づく敵に強い。", apply: s => s.player.orbits++ },
+    orbit: { name: "チャクラム", asset: assetPaths.upgrades.orbit, desc: "周囲を回る弾を1つ追加。近づく敵に強いエクステンション。", apply: s => s.player.orbits++ },
     range: { name: "ギョク", asset: assetPaths.upgrades.range, desc: "自動攻撃の射程が広がる。遠距離敵を処理しやすい。", apply: s => s.player.range += 42 },
     haste: { name: "ブーツ", asset: assetPaths.upgrades.haste, desc: "移動速度とCE回収範囲が上がる。", apply: s => { s.player.speed += 28; s.player.magnet += 24; } },
-    wall: { name: "シールドシステム", asset: assetPaths.upgrades.wall, desc: "ヨシュカの周囲に防衛弾を追加。", apply: s => s.cryptid.wall++ },
+    wall: { name: "シールドシステム", asset: assetPaths.upgrades.wall, desc: "ヨシュカの周囲に防衛弾を追加するエクステンション。", apply: s => s.cryptid.wall++ },
     heal: { name: "パンケーキ", asset: assetPaths.upgrades.heal, desc: "ヨシュカのHPを少し回復する。", apply: s => s.cryptid.hp = clamp(s.cryptid.hp + 22, 0, s.cryptid.maxHp) },
     slow: { name: "籠罠", asset: assetPaths.upgrades.slow, desc: "ヨシュカ周辺の敵を遅くする。", apply: s => s.cryptid.slow += 0.08 },
     pierce: { name: "ジャベリン", asset: assetPaths.upgrades.pierce, desc: "通常攻撃が1体貫通。弾の威力は少し下がるが密集に強い。", apply: s => s.player.pierce++ },
@@ -281,14 +282,14 @@
     if (phase <= 0) return ["walker"];
     if (phase === 1) return ["walker", "runner"];
     if (phase === 2) return ["walker", "runner", "archer"];
-    if (phase === 3) return ["walker", "runner", "archer", "splitter"];
+    if (phase === 3) return ["walker", "runner", "archer", "splitter", "hexer"];
     return ["walker", "runner", "archer", "splitter", "hexer"];
   }
 
   function spawnBudget(s) {
     const phase = currentPhase(s.t);
     let budget = 0.74 + phase * 0.62;
-    if (s.oni) budget = 3.2 + Math.min(4.0, s.oniTime * 0.09);
+    if (s.oni) budget = 4.2 + Math.min(8.0, s.oniTime * 0.17);
     if (phase >= 4) budget += 0.35;
     if (phase >= 5) budget += 0.55;
     if (s.t < 25) budget *= 0.72;
@@ -296,14 +297,32 @@
     if (!s.oni && s.cryptid.hp < 35) budget *= 0.58;
     if (!s.oni && s.enemies.length > 28) budget *= 0.35;
     if (!s.oni && s.enemies.length > 42) budget = 0;
-    if (s.oni && s.enemies.length > 58) budget *= 0.35;
-    if (s.oni && s.enemies.length > 86) budget = 0;
+    if (s.oni && s.enemies.length > 84) budget *= 0.45;
+    if (s.oni && s.enemies.length > 130) budget = 0;
     return budget;
   }
 
   function pickEnemy(s) {
     const phase = currentPhase(s.t);
-    const allowed = s.oni ? ["walker", "runner", "archer", "splitter", "hexer"] : allowedEnemies(phase);
+    if (s.oni) {
+      const pool = ["walker", "runner", "archer", "splitter", "hexer"];
+      const weights = pool.map(k => {
+        if (k === "walker") return 2.0;
+        if (k === "runner") return 2.2;
+        if (k === "archer") return 2.0;
+        if (k === "splitter") return 1.5 + Math.min(1.2, s.oniTime * 0.025);
+        if (k === "hexer") return 1.2 + Math.min(1.4, s.oniTime * 0.03);
+        return 1;
+      });
+      const total = weights.reduce((a, b) => a + b, 0);
+      let r = Math.random() * total;
+      for (let i = 0; i < pool.length; i++) {
+        r -= weights[i];
+        if (r <= 0) return pool[i];
+      }
+      return pool[0];
+    }
+    const allowed = allowedEnemies(phase);
     const recent = s.threatMemory.slice(-4);
     const heavyRecent = recent.filter(k => enemyDefs[k].cost >= 5).length;
     let pool = allowed.filter(k => !(enemyDefs[k].cost >= 5 && heavyRecent >= 2));
@@ -313,7 +332,7 @@
       if (k === "runner") return 2 + phase * 0.2;
       if (k === "archer") return phase >= 2 ? 1.6 : 0;
       if (k === "splitter") return phase >= 3 ? 1.1 : 0;
-      if (k === "hexer") return phase >= 4 ? 0.9 : 0;
+      if (k === "hexer") return phase >= 4 ? 1.8 : 0.75;
       return 1;
     });
     const total = weights.reduce((a, b) => a + b, 0);
@@ -334,9 +353,12 @@
     else if (side === 1) { x = W + 30; y = rand(-40, H + 40); }
     else if (side === 2) { x = rand(-40, W + 40); y = H + 30; }
     else { x = -30; y = rand(-40, H + 40); }
+    const oniHpMult = state.oni ? 1.9 + Math.min(1.2, state.oniTime * 0.025) : 1;
+    const oniSpeedMult = state.oni ? 1.25 + Math.min(0.35, state.oniTime * 0.008) : 1;
+    const oniDamageMult = state.oni ? 1.45 + Math.min(0.4, state.oniTime * 0.008) : 1;
     const e = {
-      type, x, y, r: def.radius, hp: def.hp * (state.oni ? 1.55 : 1), maxHp: def.hp * (state.oni ? 1.55 : 1),
-      speed: def.speed * (state.oni ? 1.18 : 1), damage: def.damage * (state.oni ? 1.35 : 1), color: def.color, cd: rand(0.4, 1.2), warned: false, oni: state.oni,
+      type, x, y, r: def.radius, hp: def.hp * oniHpMult, maxHp: def.hp * oniHpMult,
+      speed: def.speed * oniSpeedMult, damage: def.damage * oniDamageMult, color: def.color, cd: rand(0.4, 1.2), warned: false, oni: state.oni,
     };
     if (def.ranged || def.debuff) {
       state.warnings.push({ x, y, text: def.ranged ? "遠距離敵" : "妨害敵", life: 1.25, color: def.ranged ? "#f78bd8" : "#b58cff" });
@@ -381,7 +403,7 @@
   function spawnSystem(s, dt) {
     s.spawnAcc += spawnBudget(s) * dt;
     let guard = 0;
-    while (s.spawnAcc >= 1 && guard++ < 4) {
+    while (s.spawnAcc >= 1 && guard++ < (s.oni ? 7 : 4)) {
       const type = pickEnemy(s);
       const cost = enemyDefs[type].cost;
       if (s.spawnAcc >= Math.max(1, cost * 0.55)) {
@@ -582,7 +604,8 @@
     if (!reward) return;
     const def = enemyDefs[e.type];
     s.kills++;
-    const gainedScore = Math.floor(def.score * (s.scoreMultiplier || 1));
+    const baseScore = s.oni ? (def.oniScore || def.score * 2) : def.score;
+    const gainedScore = Math.floor(baseScore * (s.scoreMultiplier || 1));
     s.score += gainedScore;
     s.stats.enemyScore += gainedScore;
     if (s.oni) s.stats.oniBonus += gainedScore - def.score;
@@ -732,14 +755,15 @@
   function chooseUpgradeCandidates(s) {
     const ids = new Set();
     for (const id of nearEvolutionCandidateIds(s)) ids.add(id);
-    if (s.cryptid.hp < 55) ids.add("heal");
+    if (!s.oni && s.cryptid.hp < 55) ids.add("heal");
     if (s.enemies.length > 24) ids.add("orbit");
     if (s.enemies.length > 18) ids.add("shotgun");
     if (s.enemies.some(e => e.type === "archer")) ids.add("range");
     if (s.cryptid.hp < 35) ids.add("shield");
-    const all = Object.keys(upgrades);
+    if (s.oni) ids.delete("heal");
+    const all = Object.keys(upgrades).filter(id => !(s.oni && id === "heal"));
     while (ids.size < 3) ids.add(all[Math.floor(Math.random() * all.length)]);
-    return Array.from(ids).slice(0, 3);
+    return Array.from(ids).filter(id => !(s.oni && id === "heal")).slice(0, 3);
   }
 
   function buildUpgradeCard(id) {
@@ -760,7 +784,7 @@
     } else if (best) {
       evoHtml = `<div class="evo-box"><div><b>進化候補</b><span>${best.name}: ${best.afterTotal}/${best.totalNeed}</span><small>必要: ${best.missing || "条件達成"}</small></div></div>`;
     }
-    btn.innerHTML = `${img}<div class="upgrade-title"><b>${u.name}</b>${level}</div><small>${u.desc}</small>${evoHtml}`;
+    btn.innerHTML = `${img}<div class="upgrade-title"><b>${u.name}</b>${level}</div><small class="upgrade-desc">${u.desc}</small>${evoHtml}`;
     btn.addEventListener("click", () => {
       u.apply(state);
       state.upgradeCounts[id] = (state.upgradeCounts[id] || 0) + 1;
@@ -786,8 +810,8 @@
       if (will) readyNames.push(`${upgrades[id].name}で${will.name}`);
     }
     if (readyNames.length) return `進化間近: ${readyNames.slice(0, 2).join(" / ")}`;
-    if (near.length) return `進化に近い加護を候補に含めています。Lv表示と必要素材を見て選べます。`;
-    return s.cryptid.hp < 45 ? "ヨシュカが危険です。守りを厚くする候補を含めています。" : "加護を選ぶとLvが上がります。組み合わせ条件を満たすと上位エクステへ進化します。";
+    if (near.length) return `進化に近いエクステンションを候補に含めています。Lv表示と必要素材を見て選べます。`;
+    return s.cryptid.hp < 45 ? "ヨシュカが危険です。守りを厚くする候補を含めています。" : "エクステンションを選ぶとLvが上がります。組み合わせ条件を満たすと上位エクステへ進化します。";
   }
 
   function openUpgrade() {
@@ -850,20 +874,20 @@
     const panel = screens.result;
     if (!panel) return;
     panel.classList.remove("fallback-gold");
-    window.setTimeout(() => {
-      const modal = window.GoldChestModal;
-      if (modal && typeof modal.show === "function") {
-        try {
-          modal.show();
-          return;
-        } catch (err) {
-          console.warn("GoldChestModal.show() failed. Using fallback effect.", err);
-        }
-      }
-      panel.classList.add("fallback-gold");
-    }, 120);
   }
 
+  function showGoldChest() {
+    const panel = screens.result;
+    if (panel) panel.classList.remove("fallback-gold");
+    const modal = window.GoldChestModal;
+    if (modal && typeof modal.show === "function") {
+      try { modal.show(); return; } catch (err) { console.warn("GoldChestModal.show() failed. Using fallback effect.", err); }
+    }
+    if (panel) {
+      panel.classList.add("fallback-gold");
+      window.setTimeout(() => panel.classList.remove("fallback-gold"), 1300);
+    }
+  }
 
   function draw() {
     if (!state) return;
@@ -1011,6 +1035,7 @@
   document.getElementById("retryBtn").addEventListener("click", newGame);
   document.getElementById("titleBtn").addEventListener("click", () => { updateBestText(); setScreen("start"); });
   document.getElementById("pauseBtn").addEventListener("click", () => { if (!state || pausedForUpgrade) return; state.paused = !state.paused; last = performance.now(); if (!state.paused) requestAnimationFrame(loop); draw(); });
+  if (ui.goldChestBtn) ui.goldChestBtn.addEventListener("click", showGoldChest);
 
   window.addEventListener("resize", resize);
   window.addEventListener("orientationchange", () => setTimeout(resize, 250));

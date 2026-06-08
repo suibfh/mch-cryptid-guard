@@ -47,8 +47,14 @@
 
 ## Later
 - Audio/BGM/: BGM
-- Audio/SE/: 攻撃、被弾、CE取得、加護取得、進化、勝利、敗北
+- Audio/SE/: 攻撃、被弾、CE取得、エクステンション取得、進化、勝利、敗北
 - Data/Effects/GoldChest/: GitHubのGoldChestエフェクトを入れる予定の場所
 
 ## Current temporary mapping notes
 通常敵5タイプ、鬼TIME敵5タイプともに指定済みです。
+
+
+## v5.5 updates
+- UI text unified from 加護 to エクステンション.
+- Result screen gold chest button calls GoldChestModal.show() when files are present.
+- Oni TIME excludes パンケーキ from extension choices and increases enemy pressure over time.

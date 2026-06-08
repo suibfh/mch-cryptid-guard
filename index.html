@@ -11,7 +11,7 @@
   <main id="app">
     <section id="startScreen" class="panel screen active">
       <div class="brand">MCH Yoshka Guard</div>
-      <h1>ヨシュカを防衛せよ</h1>
+      <h1>ヨシュカを守れ</h1>
       <p class="lead">無敵のヨシュカが弱っている…。助けるっていうのかい？<br>いいぜ、3分で支度しな！</p>
       <div class="grid two">
         <button class="hero-card selected" data-hero="balanced">
@@ -69,13 +69,17 @@
     </section>
 
     <section id="upgradeScreen" class="panel overlay">
-      <h2>エクステンション加護</h2>
+      <h2>エクステンション選択</h2>
       <p id="upgradeHint">今の状況に応じた候補が出ます。</p>
       <div id="upgradeOptions" class="grid three"></div>
     </section>
 
     <section id="resultScreen" class="panel screen result-panel">
       <div id="goldFx" class="gold-fx" aria-hidden="true"></div>
+      <button id="goldChestBtn" class="gold-chest-btn" type="button" aria-label="金箱を開く">
+        <img src="Data/Effects/GoldChest/assets/treasure-chest.svg" alt="" onerror="this.style.display='none'" draggable="false" />
+        <span>金箱を開く</span>
+      </button>
       <h2 id="resultTitle">結果</h2>
       <p id="resultSummary"></p>
       <div id="resultStats" class="result-stats"></div>
