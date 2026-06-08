@@ -884,6 +884,9 @@
     const panel = screens.result;
     if (!panel) return;
     panel.classList.remove("fallback-gold");
+    window.setTimeout(() => {
+      if (mode === "result") showGoldChest();
+    }, 260);
   }
 
   function showGoldChest() {
@@ -895,6 +898,7 @@
       try {
         modal.show();
         modalShown = true;
+        bringConfettiToFront();
       } catch (err) {
         console.warn("GoldChestModal.show() failed. Using fallback effect.", err);
       }
@@ -909,6 +913,15 @@
     }
   }
 
+  function bringConfettiToFront() {
+    const canvas = document.getElementById("confetti-canvas");
+    if (canvas) {
+      canvas.style.zIndex = "2147483647";
+      canvas.style.pointerEvents = "none";
+      canvas.style.position = "fixed";
+    }
+  }
+
   function launchLocalConfetti() {
     const canvas = document.createElement("canvas");
     canvas.className = "local-confetti";
@@ -917,6 +930,7 @@
     canvas.style.width = "100vw";
     canvas.style.height = "100vh";
     document.body.appendChild(canvas);
+    bringConfettiToFront();
     const dpr = window.devicePixelRatio || 1;
     const c = canvas.getContext("2d");
     c.scale(dpr, dpr);
@@ -1008,6 +1022,35 @@
   function drawCryptid(s) {
     const c = s.cryptid;
     ctx.save();
+
+    // Draw field effects first. If globalAlpha is not reset here,
+    // the orbiting extension becomes faint and looks hidden under the aura.
+    ctx.shadowBlur = 0;
+    if (c.slow > 0) {
+      ctx.globalAlpha = 0.12;
+      circle(c.x, c.y, 120, "#83d6ff");
+      ctx.globalAlpha = 1;
+    }
+    if (s.evolutions.sanctuary) {
+      ctx.globalAlpha = 0.10;
+      circle(c.x, c.y, 124, "#b8f7ff");
+      ctx.globalAlpha = 1;
+    }
+
+    // Orbiting extensions sit above the slow/sanctuary aura.
+    const wallCount = effectiveWallCount(s);
+    for (let i = 0; i < wallCount; i++) {
+      const a = -s.t * (1.35 + i * 0.06) + (Math.PI * 2 * i) / Math.max(1, wallCount);
+      const x = c.x + Math.cos(a) * 56;
+      const y = c.y + Math.sin(a) * 56;
+      ctx.save();
+      ctx.shadowColor = s.evolutions.sanctuary ? "#b8f7ff" : "#83d6ff";
+      ctx.shadowBlur = 12;
+      circle(x, y, 8, s.evolutions.sanctuary ? "#b8f7ff" : "#83d6ff");
+      ctx.restore();
+    }
+
+    // Yoshka is drawn last so the body stays crisp while the orbit remains visible outside it.
     ctx.shadowColor = c.hitFlash > 0 ? "#ff7979" : (s.oni ? "#ff4b4b" : "#83d6ff");
     ctx.shadowBlur = 24;
     const ok = drawAsset(s.oni ? assetPaths.yoshkaOni : assetPaths.yoshka, c.x, c.y, 78, 78);
@@ -1017,11 +1060,6 @@
       ctx.strokeStyle = s.oni ? "#ff4b4b" : "#83d6ff"; ctx.lineWidth = 3; ctx.stroke();
       ctx.fillStyle = "#fff"; ctx.font = "24px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(s.oni ? "鬼" : "◇", c.x, c.y + 1);
     }
-    ctx.shadowBlur = 0;
-    if (c.slow > 0) { ctx.globalAlpha = 0.12; circle(c.x, c.y, 120, "#83d6ff"); }
-    const wallCount = effectiveWallCount(s);
-    for (let i = 0; i < wallCount; i++) { const a = -s.t * (1.35 + i * 0.06) + (Math.PI * 2 * i) / Math.max(1, wallCount); circle(c.x + Math.cos(a)*56, c.y + Math.sin(a)*56, 8, s.evolutions.sanctuary ? "#b8f7ff" : "#83d6ff"); }
-    if (s.evolutions.sanctuary) { ctx.globalAlpha = 0.1; circle(c.x, c.y, 124, "#b8f7ff"); ctx.globalAlpha = 1; }
     ctx.restore();
   }
   function drawPlayer(s) {

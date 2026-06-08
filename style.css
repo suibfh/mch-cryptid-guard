@@ -359,3 +359,12 @@ body.stick-right #pauseBtn { left: calc(var(--game-left, 0px) + 22px); }
   z-index: 999999;
   pointer-events: none;
 }
+
+
+/* v5.8: automatic GoldChest and topmost confetti */
+.gold-chest-btn { display: none !important; }
+#confetti-canvas, .local-confetti {
+  z-index: 2147483647 !important;
+  pointer-events: none !important;
+  position: fixed !important;
+}
