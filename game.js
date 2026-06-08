@@ -114,10 +114,16 @@
   const audioState = {
     bgm: {},
     se: {},
+    bgmBuffers: {},
     seBuffers: {},
     audioCtx: null,
-    unlocked: false,
+    bgmGain: null,
+    bgmSource: null,
+    bgmStartedAt: 0,
     currentBgm: null,
+    currentBgmId: null,
+    currentBgmLoop: true,
+    unlocked: false,
     lastSe: {},
     ready: false,
     settings: loadAudioSettings(),
@@ -153,35 +159,57 @@
     applyAudioVolumes();
   }
 
+  function ensureAudioContext() {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    if (!audioState.audioCtx) audioState.audioCtx = new AC();
+    if (audioState.audioCtx.state !== "running") audioState.audioCtx.resume().catch(() => {});
+    if (!audioState.bgmGain) {
+      audioState.bgmGain = audioState.audioCtx.createGain();
+      audioState.bgmGain.connect(audioState.audioCtx.destination);
+    }
+    applyAudioVolumes();
+    return audioState.audioCtx;
+  }
 
-  async function prepareSeBuffers() {
-    if (!audioState.audioCtx) return;
+  async function loadAudioBuffer(kind, id, path) {
+    const ctx = ensureAudioContext();
+    if (!ctx) return null;
+    const store = kind === "bgm" ? audioState.bgmBuffers : audioState.seBuffers;
+    if (store[id]) return store[id];
+    try {
+      const res = await fetch(path);
+      if (!res.ok) return null;
+      const arr = await res.arrayBuffer();
+      store[id] = await ctx.decodeAudioData(arr.slice(0));
+      return store[id];
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function prepareSeBuffers() {
+    ensureAudioContext();
     for (const [id, path] of Object.entries(audioPaths.se)) {
-      if (audioState.seBuffers[id]) continue;
-      try {
-        const res = await fetch(path);
-        if (!res.ok) continue;
-        const arr = await res.arrayBuffer();
-        audioState.seBuffers[id] = await audioState.audioCtx.decodeAudioData(arr.slice(0));
-      } catch (err) {
-        // HTMLAudio fallback is used when WebAudio decoding is unavailable.
-      }
+      if (!audioState.seBuffers[id]) loadAudioBuffer("se", id, path);
+    }
+  }
+
+  function prepareBgmBuffers() {
+    ensureAudioContext();
+    for (const [id, path] of Object.entries(audioPaths.bgm)) {
+      if (!audioState.bgmBuffers[id]) loadAudioBuffer("bgm", id, path);
     }
   }
 
   function unlockAudio() {
     initAudio();
     try {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (AC && !audioState.audioCtx) audioState.audioCtx = new AC();
-      if (audioState.audioCtx && audioState.audioCtx.state !== "running") {
-        audioState.audioCtx.resume().catch(() => {});
-      }
-      // Do not run a silent play/pause probe here. On iOS/desktop this can
-      // interrupt BGM and can also consume the user gesture before the real play().
+      ensureAudioContext();
       audioState.unlocked = true;
       applyAudioVolumes();
       prepareSeBuffers();
+      prepareBgmBuffers();
     } catch {
       audioState.unlocked = true;
       applyAudioVolumes();
@@ -196,30 +224,74 @@
 
   function applyAudioVolumes() {
     const mute = !!audioState.settings.muted;
-    for (const a of Object.values(audioState.bgm)) a.volume = mute ? 0 : clamp(audioState.settings.bgm ?? 0.7, 0, 1);
-    for (const a of Object.values(audioState.se)) a.volume = mute ? 0 : clamp(audioState.settings.se ?? 0.7, 0, 1);
+    const bgmVol = mute ? 0 : clamp(audioState.settings.bgm ?? 0.7, 0, 1);
+    const seVol = mute ? 0 : clamp(audioState.settings.se ?? 0.7, 0, 1);
+    for (const a of Object.values(audioState.bgm)) a.volume = bgmVol;
+    for (const a of Object.values(audioState.se)) a.volume = seVol;
+    if (audioState.bgmGain) audioState.bgmGain.gain.value = bgmVol;
     syncAudioControls();
   }
 
   function stopAllBgm() {
+    if (audioState.bgmSource) {
+      try { audioState.bgmSource.stop(0); } catch {}
+      try { audioState.bgmSource.disconnect(); } catch {}
+      audioState.bgmSource = null;
+    }
     for (const a of Object.values(audioState.bgm)) {
       try { a.pause(); a.currentTime = 0; } catch {}
     }
     audioState.currentBgm = null;
+    audioState.currentBgmId = null;
+  }
+
+  function startWebBgm(id, buffer, loop) {
+    const ctx = ensureAudioContext();
+    if (!ctx || !buffer) return false;
+    if (audioState.currentBgmId !== id) return false;
+    if (audioState.bgmSource) {
+      try { audioState.bgmSource.stop(0); } catch {}
+      try { audioState.bgmSource.disconnect(); } catch {}
+      audioState.bgmSource = null;
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.loop = !!loop;
+    src.connect(audioState.bgmGain);
+    src.start(0);
+    audioState.bgmSource = src;
+    audioState.bgmStartedAt = ctx.currentTime;
+    src.onended = () => {
+      if (audioState.bgmSource === src && !src.loop) audioState.bgmSource = null;
+    };
+    return true;
   }
 
   function playBgm(id, loop = true) {
     initAudio();
     if (!audioState.unlocked) unlockAudio();
     const a = audioState.bgm[id];
-    if (!a) return;
-    if (audioState.currentBgm === a && !a.paused) return;
+    if (!a && !audioPaths.bgm[id]) return;
+    if (audioState.currentBgmId === id && (audioState.bgmSource || (a && !a.paused))) return;
     stopAllBgm();
+    audioState.currentBgmId = id;
+    audioState.currentBgmLoop = !!loop;
+    applyAudioVolumes();
+
+    const ctx = ensureAudioContext();
+    if (ctx) {
+      loadAudioBuffer("bgm", id, audioPaths.bgm[id]).then(buffer => {
+        if (!buffer || audioState.currentBgmId !== id) return;
+        startWebBgm(id, buffer, loop);
+      });
+      return;
+    }
+
+    // Fallback for browsers without WebAudio. Note: iOS Safari ignores HTMLAudio volume.
+    if (!a) return;
     a.loop = !!loop;
     a.currentTime = 0;
-    applyAudioVolumes();
     audioState.currentBgm = a;
-    if (audioState.audioCtx && audioState.audioCtx.state !== "running") audioState.audioCtx.resume().catch(() => {});
     const promise = a.play();
     if (promise && promise.catch) promise.catch(() => {});
   }
@@ -234,14 +306,14 @@
 
     const vol = clamp(audioState.settings.se ?? 0.7, 0, 1);
     const buffer = audioState.seBuffers[id];
-    if (audioState.audioCtx && buffer) {
+    const ctx = ensureAudioContext();
+    if (ctx && buffer) {
       try {
-        if (audioState.audioCtx.state !== "running") audioState.audioCtx.resume().catch(() => {});
-        const src = audioState.audioCtx.createBufferSource();
-        const gain = audioState.audioCtx.createGain();
+        const src = ctx.createBufferSource();
+        const gain = ctx.createGain();
         gain.gain.value = vol;
         src.buffer = buffer;
-        src.connect(gain).connect(audioState.audioCtx.destination);
+        src.connect(gain).connect(ctx.destination);
         src.start(0);
         return;
       } catch {}
