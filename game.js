@@ -114,6 +114,9 @@
   const audioState = {
     bgm: {},
     se: {},
+    seBuffers: {},
+    audioCtx: null,
+    unlocked: false,
     currentBgm: null,
     lastSe: {},
     ready: false,
@@ -148,6 +151,48 @@
     applyAudioVolumes();
   }
 
+
+  async function prepareSeBuffers() {
+    if (!audioState.audioCtx) return;
+    for (const [id, path] of Object.entries(audioPaths.se)) {
+      if (audioState.seBuffers[id]) continue;
+      try {
+        const res = await fetch(path);
+        if (!res.ok) continue;
+        const arr = await res.arrayBuffer();
+        audioState.seBuffers[id] = await audioState.audioCtx.decodeAudioData(arr.slice(0));
+      } catch (err) {
+        // HTMLAudio fallback is used when WebAudio decoding is unavailable.
+      }
+    }
+  }
+
+  function unlockAudio() {
+    initAudio();
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC && !audioState.audioCtx) audioState.audioCtx = new AC();
+      if (audioState.audioCtx && audioState.audioCtx.state !== "running") audioState.audioCtx.resume().catch(() => {});
+      prepareSeBuffers();
+      for (const a of [...Object.values(audioState.bgm), ...Object.values(audioState.se)]) {
+        try {
+          const oldMuted = a.muted;
+          const oldVol = a.volume;
+          a.muted = true;
+          a.volume = 0;
+          const pr = a.play();
+          if (pr && pr.catch) pr.catch(() => {});
+          a.pause();
+          a.currentTime = 0;
+          a.muted = oldMuted;
+          a.volume = oldVol;
+        } catch {}
+      }
+      audioState.unlocked = true;
+      applyAudioVolumes();
+    } catch {}
+  }
+
   function syncAudioControls() {
     if (ui.bgmVolume) ui.bgmVolume.value = Math.round((audioState.settings.bgm ?? 0.7) * 100);
     if (ui.seVolume) ui.seVolume.value = Math.round((audioState.settings.se ?? 0.7) * 100);
@@ -178,21 +223,39 @@
     a.currentTime = 0;
     applyAudioVolumes();
     audioState.currentBgm = a;
+    if (audioState.audioCtx && audioState.audioCtx.state !== "running") audioState.audioCtx.resume().catch(() => {});
     const promise = a.play();
     if (promise && promise.catch) promise.catch(() => {});
   }
 
   function playSe(id, cooldown = 0.08) {
     initAudio();
-    const a = audioState.se[id];
-    if (!a || audioState.settings.muted) return;
+    if (audioState.settings.muted) return;
     const now = performance.now();
     if ((audioState.lastSe[id] || 0) + cooldown * 1000 > now) return;
     audioState.lastSe[id] = now;
+
+    const vol = clamp(audioState.settings.se ?? 0.7, 0, 1);
+    const buffer = audioState.seBuffers[id];
+    if (audioState.audioCtx && buffer) {
+      try {
+        if (audioState.audioCtx.state !== "running") audioState.audioCtx.resume().catch(() => {});
+        const src = audioState.audioCtx.createBufferSource();
+        const gain = audioState.audioCtx.createGain();
+        gain.gain.value = vol;
+        src.buffer = buffer;
+        src.connect(gain).connect(audioState.audioCtx.destination);
+        src.start(0);
+        return;
+      } catch {}
+    }
+
+    const a = audioState.se[id];
+    if (!a) return;
     try {
       a.pause();
       a.currentTime = 0;
-      a.volume = clamp(audioState.settings.se ?? 0.7, 0, 1);
+      a.volume = vol;
       const promise = a.play();
       if (promise && promise.catch) promise.catch(() => {});
     } catch {}
@@ -1316,7 +1379,7 @@
       selectedHero = btn.dataset.hero;
     });
   });
-  document.getElementById("startBtn").addEventListener("click", newGame);
+  document.getElementById("startBtn").addEventListener("click", e => { unlockAudio(); newGame(); });
   document.getElementById("howBtn").addEventListener("click", () => setScreen("how"));
   if (ui.stickSideBtn) ui.stickSideBtn.addEventListener("click", toggleStickSide);
   document.getElementById("backBtn").addEventListener("click", () => setScreen("start"));
@@ -1324,11 +1387,43 @@
   document.getElementById("titleBtn").addEventListener("click", () => { stopAllBgm(); updateBestText(); setScreen("start"); });
   document.getElementById("pauseBtn").addEventListener("click", () => { if (!state || pausedForUpgrade) return; state.paused = !state.paused; last = performance.now(); if (!state.paused) requestAnimationFrame(loop); draw(); });
   if (ui.goldChestBtn) ui.goldChestBtn.addEventListener("click", showGoldChest);
-  if (ui.audioBtn) ui.audioBtn.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); initAudio(); toggleAudioPanel(); });
-  if (ui.bgmVolume) ui.bgmVolume.addEventListener("input", e => { e.stopPropagation(); audioState.settings.bgm = Number(ui.bgmVolume.value) / 100; saveAudioSettings(); applyAudioVolumes(); });
-  if (ui.seVolume) ui.seVolume.addEventListener("input", e => { e.stopPropagation(); audioState.settings.se = Number(ui.seVolume.value) / 100; saveAudioSettings(); applyAudioVolumes(); });
-  if (ui.muteBtn) ui.muteBtn.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); audioState.settings.muted = !audioState.settings.muted; saveAudioSettings(); applyAudioVolumes(); });
-  if (ui.audioPanel) ["pointerdown", "pointermove", "pointerup", "touchstart", "touchmove", "touchend", "click"].forEach(type => ui.audioPanel.addEventListener(type, e => e.stopPropagation(), { passive: type === "touchmove" ? false : true }));
+  function updateBgmVolumeFromUi(e) { if (e) e.stopPropagation(); initAudio(); audioState.settings.bgm = Number(ui.bgmVolume.value) / 100; saveAudioSettings(); applyAudioVolumes(); }
+  function updateSeVolumeFromUi(e) { if (e) e.stopPropagation(); initAudio(); audioState.settings.se = Number(ui.seVolume.value) / 100; saveAudioSettings(); applyAudioVolumes(); }
+  let lastAudioUiTap = 0;
+  let lastMuteUiTap = 0;
+  function toggleMuteFromUi(e) {
+    const now = performance.now();
+    if (now - lastMuteUiTap < 260) { if (e) { e.preventDefault(); e.stopPropagation(); } return; }
+    lastMuteUiTap = now;
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    unlockAudio();
+    audioState.settings.muted = !audioState.settings.muted;
+    saveAudioSettings();
+    applyAudioVolumes();
+  }
+  function openAudioFromUi(e) {
+    const now = performance.now();
+    if (now - lastAudioUiTap < 260) { if (e) { e.preventDefault(); e.stopPropagation(); } return; }
+    lastAudioUiTap = now;
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    unlockAudio();
+    toggleAudioPanel();
+  }
+  if (ui.audioBtn) {
+    ui.audioBtn.addEventListener("click", openAudioFromUi);
+    ui.audioBtn.addEventListener("touchend", openAudioFromUi, { passive: false });
+    ui.audioBtn.addEventListener("pointerup", openAudioFromUi);
+  }
+  if (ui.bgmVolume) ["input", "change", "touchend", "pointerup"].forEach(type => ui.bgmVolume.addEventListener(type, updateBgmVolumeFromUi, { passive: true }));
+  if (ui.seVolume) ["input", "change", "touchend", "pointerup"].forEach(type => ui.seVolume.addEventListener(type, updateSeVolumeFromUi, { passive: true }));
+  if (ui.muteBtn) {
+    ui.muteBtn.addEventListener("click", toggleMuteFromUi);
+    ui.muteBtn.addEventListener("touchend", toggleMuteFromUi, { passive: false });
+    ui.muteBtn.addEventListener("pointerup", toggleMuteFromUi);
+  }
+  if (ui.audioPanel) ["pointerdown", "pointermove", "pointerup", "touchstart", "touchmove", "touchend", "click"].forEach(type => ui.audioPanel.addEventListener(type, e => { e.stopPropagation(); }, { passive: true }));
+  window.addEventListener("pointerdown", unlockAudio, { once: true, passive: true });
+  window.addEventListener("touchstart", unlockAudio, { once: true, passive: true });
 
   window.addEventListener("resize", resize);
   window.addEventListener("orientationchange", () => setTimeout(resize, 250));

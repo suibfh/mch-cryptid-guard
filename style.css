@@ -398,3 +398,10 @@ body.stick-right #pauseBtn { left: calc(var(--game-left, 0px) + 22px); }
   #audioBtn { left: calc(var(--game-left, 0px) + var(--game-width, 100vw) - 72px); top: calc(var(--game-top, 0px) + 48px); padding: 7px 10px; font-size: 12px; }
   .audio-panel { width: 168px; top: calc(var(--game-top, 0px) + 86px); right: calc(100vw - var(--game-left, 0px) - var(--game-width, 100vw) + 8px); padding: 8px; }
 }
+
+
+/* v6.2 mobile audio control fixes */
+#audioBtn, .audio-panel { z-index: 2147483600 !important; pointer-events: auto !important; }
+.audio-panel, .audio-panel * { -webkit-user-select: auto; user-select: auto; -webkit-touch-callout: default; }
+.audio-panel input[type=range] { touch-action: pan-x !important; -webkit-user-select: auto; user-select: auto; accent-color: #83d6ff; }
+.audio-panel button, #audioBtn { touch-action: manipulation !important; }
