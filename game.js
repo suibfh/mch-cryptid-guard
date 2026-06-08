@@ -29,6 +29,11 @@
     gameScreen: document.getElementById("gameScreen"),
     stickSideBtn: document.getElementById("stickSideBtn"),
     goldChestBtn: document.getElementById("goldChestBtn"),
+    audioBtn: document.getElementById("audioBtn"),
+    audioPanel: document.getElementById("audioPanel"),
+    bgmVolume: document.getElementById("bgmVolume"),
+    seVolume: document.getElementById("seVolume"),
+    muteBtn: document.getElementById("muteBtn"),
   };
 
   const W = 960;
@@ -89,6 +94,115 @@
       sanctuary: "Image/Extensions/5147.png",
     }
   };
+
+
+  const AUDIO_KEY = "mch_yoshka_guard_audio_v1";
+  const audioPaths = {
+    bgm: {
+      raid: "Audio/BGM/raid.mp3",
+      oni: "Audio/BGM/pvp.mp3",
+      win: "Audio/BGM/win.mp3",
+      lose: "Audio/BGM/lose.mp3",
+    },
+    se: {
+      damage: "Audio/SE/1_single_damage.mp3",
+      select: "Audio/SE/3_heal_resurrection.mp3",
+      shoot: "Audio/SE/2_area_damage.mp3",
+    }
+  };
+
+  const audioState = {
+    bgm: {},
+    se: {},
+    currentBgm: null,
+    lastSe: {},
+    ready: false,
+    settings: loadAudioSettings(),
+  };
+
+  function loadAudioSettings() {
+    try { return { bgm: 0.7, se: 0.7, muted: false, ...(JSON.parse(localStorage.getItem(AUDIO_KEY)) || {}) }; }
+    catch { return { bgm: 0.7, se: 0.7, muted: false }; }
+  }
+
+  function saveAudioSettings() {
+    localStorage.setItem(AUDIO_KEY, JSON.stringify(audioState.settings));
+  }
+
+  function initAudio() {
+    if (audioState.ready) return;
+    for (const [id, path] of Object.entries(audioPaths.bgm)) {
+      const a = new Audio(path);
+      a.preload = "auto";
+      a.volume = 0;
+      audioState.bgm[id] = a;
+    }
+    for (const [id, path] of Object.entries(audioPaths.se)) {
+      const a = new Audio(path);
+      a.preload = "auto";
+      a.volume = 0;
+      audioState.se[id] = a;
+    }
+    audioState.ready = true;
+    syncAudioControls();
+    applyAudioVolumes();
+  }
+
+  function syncAudioControls() {
+    if (ui.bgmVolume) ui.bgmVolume.value = Math.round((audioState.settings.bgm ?? 0.7) * 100);
+    if (ui.seVolume) ui.seVolume.value = Math.round((audioState.settings.se ?? 0.7) * 100);
+    if (ui.muteBtn) ui.muteBtn.textContent = `ミュート: ${audioState.settings.muted ? "ON" : "OFF"}`;
+  }
+
+  function applyAudioVolumes() {
+    const mute = !!audioState.settings.muted;
+    for (const a of Object.values(audioState.bgm)) a.volume = mute ? 0 : clamp(audioState.settings.bgm ?? 0.7, 0, 1);
+    for (const a of Object.values(audioState.se)) a.volume = mute ? 0 : clamp(audioState.settings.se ?? 0.7, 0, 1);
+    syncAudioControls();
+  }
+
+  function stopAllBgm() {
+    for (const a of Object.values(audioState.bgm)) {
+      try { a.pause(); a.currentTime = 0; } catch {}
+    }
+    audioState.currentBgm = null;
+  }
+
+  function playBgm(id, loop = true) {
+    initAudio();
+    const a = audioState.bgm[id];
+    if (!a) return;
+    if (audioState.currentBgm === a && !a.paused) return;
+    stopAllBgm();
+    a.loop = !!loop;
+    a.currentTime = 0;
+    applyAudioVolumes();
+    audioState.currentBgm = a;
+    const promise = a.play();
+    if (promise && promise.catch) promise.catch(() => {});
+  }
+
+  function playSe(id, cooldown = 0.08) {
+    initAudio();
+    const base = audioState.se[id];
+    if (!base || audioState.settings.muted) return;
+    const now = performance.now();
+    if ((audioState.lastSe[id] || 0) + cooldown * 1000 > now) return;
+    audioState.lastSe[id] = now;
+    try {
+      const a = base.cloneNode(true);
+      a.volume = clamp(audioState.settings.se ?? 0.7, 0, 1);
+      const promise = a.play();
+      if (promise && promise.catch) promise.catch(() => {});
+    } catch {}
+  }
+
+  function toggleAudioPanel() {
+    if (!ui.audioPanel) return;
+    ui.audioPanel.classList.toggle("active");
+    ui.audioPanel.setAttribute("aria-hidden", ui.audioPanel.classList.contains("active") ? "false" : "true");
+  }
+
   const imageCache = new Map();
   function loadImage(path) {
     if (!path) return null;
@@ -260,6 +374,8 @@
       ended: false,
     };
     pausedForUpgrade = false;
+    initAudio();
+    playBgm("raid", true);
     setScreen("game");
     resize();
     last = performance.now();
@@ -274,6 +390,7 @@
     s.cryptid.hp = Math.min(s.cryptid.maxHp, s.cryptid.hp + 18);
     s.evolutionBanner = { text: "鬼TIME", life: 3.0, oni: true };
     s.warnings.push({ x: W / 2, y: 78, text: "鬼TIME", life: 2.2, color: "#ff4b4b" });
+    playBgm("oni", false);
   }
 
   function currentPhase(t) {
@@ -497,6 +614,7 @@
     const baseDamage = s.player.damage * piercePenalty;
     const mainColor = s.evolutions.pierceShotgun ? "#ff5fa2" : (s.player.pierce >= 3 ? "#ff9f43" : s.player.color);
     s.bullets.push({ x: s.player.x, y: s.player.y, vx: Math.cos(a) * 400, vy: Math.sin(a) * 400, r: s.evolutions.pierceShotgun ? 6 : 5, damage: baseDamage, life: 1.22, pierce: s.player.pierce, color: mainColor, owner: "player", glow: !!s.evolutions.pierceShotgun });
+    if (s.player.pierce > 0 || s.player.shotgun > 0 || s.evolutions.holyShot || s.evolutions.pierceShotgun) playSe("shoot", 0.22);
     if (s.player.shotgun > 0) {
       let pellets = Math.min(2 + s.player.shotgun * 2, 8);
       let spread = Math.min(0.32 + s.player.shotgun * 0.06, 0.62);
@@ -643,6 +761,7 @@
     }
     s.cryptid.hp = clamp(s.cryptid.hp - amount, 0, s.cryptid.maxHp);
     s.cryptid.hitFlash = 0.2;
+    playSe("damage", 0.18);
     if (s.cryptid.hp <= 0) endGame(false);
   }
 
@@ -855,6 +974,7 @@
     ui.upgradeOptions.innerHTML = "";
     ui.upgradeHint.textContent = upgradeSummaryText(state);
     for (const id of candidates) ui.upgradeOptions.appendChild(buildUpgradeCard(id));
+    playSe("select", 0.25);
     setScreen("upgrade");
   }
 
@@ -901,7 +1021,8 @@
     `;
     updateBestText();
     setScreen("result");
-    triggerGoldChestEffect();
+    playBgm(state.t >= state.duration ? "win" : "lose", false);
+    if (state.t >= state.duration) triggerGoldChestEffect();
   }
 
   function triggerGoldChestEffect() {
@@ -1177,9 +1298,13 @@
   if (ui.stickSideBtn) ui.stickSideBtn.addEventListener("click", toggleStickSide);
   document.getElementById("backBtn").addEventListener("click", () => setScreen("start"));
   document.getElementById("retryBtn").addEventListener("click", newGame);
-  document.getElementById("titleBtn").addEventListener("click", () => { updateBestText(); setScreen("start"); });
+  document.getElementById("titleBtn").addEventListener("click", () => { stopAllBgm(); updateBestText(); setScreen("start"); });
   document.getElementById("pauseBtn").addEventListener("click", () => { if (!state || pausedForUpgrade) return; state.paused = !state.paused; last = performance.now(); if (!state.paused) requestAnimationFrame(loop); draw(); });
   if (ui.goldChestBtn) ui.goldChestBtn.addEventListener("click", showGoldChest);
+  if (ui.audioBtn) ui.audioBtn.addEventListener("click", toggleAudioPanel);
+  if (ui.bgmVolume) ui.bgmVolume.addEventListener("input", () => { audioState.settings.bgm = Number(ui.bgmVolume.value) / 100; saveAudioSettings(); applyAudioVolumes(); });
+  if (ui.seVolume) ui.seVolume.addEventListener("input", () => { audioState.settings.se = Number(ui.seVolume.value) / 100; saveAudioSettings(); applyAudioVolumes(); });
+  if (ui.muteBtn) ui.muteBtn.addEventListener("click", () => { audioState.settings.muted = !audioState.settings.muted; saveAudioSettings(); applyAudioVolumes(); });
 
   window.addEventListener("resize", resize);
   window.addEventListener("orientationchange", () => setTimeout(resize, 250));
@@ -1209,6 +1334,7 @@
     }
   }
 
+  syncAudioControls();
   setupStick();
   updateBestText();
   resize();

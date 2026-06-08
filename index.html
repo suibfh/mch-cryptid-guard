@@ -67,6 +67,12 @@
       </div>
       <div id="stick" aria-hidden="true"><div id="knob"></div></div>
       <button id="pauseBtn">一時停止</button>
+      <button id="audioBtn" type="button">音量</button>
+      <div id="audioPanel" class="audio-panel" aria-hidden="true">
+        <label>BGM <input id="bgmVolume" type="range" min="0" max="100" value="70"></label>
+        <label>SE <input id="seVolume" type="range" min="0" max="100" value="70"></label>
+        <button id="muteBtn" type="button">ミュート: OFF</button>
+      </div>
     </section>
 
     <section id="upgradeScreen" class="panel overlay">

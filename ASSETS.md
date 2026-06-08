@@ -58,3 +58,21 @@
 - UI text unified from 加護 to エクステンション.
 - Result screen gold chest button calls GoldChestModal.show() when files are present.
 - Oni TIME excludes パンケーキ from extension choices and increases enemy pressure over time.
+
+## Audio / v6.0
+配置してください。
+
+### BGM
+- Audio/BGM/raid.mp3: 通常BGM。ゲーム開始から3分までループ再生。
+- Audio/BGM/pvp.mp3: 鬼TIME BGM。鬼TIME突入時に再生。ループなし。
+- Audio/BGM/win.mp3: 鬼TIME到達後のリザルトBGM。
+- Audio/BGM/lose.mp3: 鬼TIME未到達時のリザルトBGM。
+
+### SE
+- Audio/SE/1_single_damage.mp3: ヨシュカ被ダメージ音。
+- Audio/SE/3_heal_resurrection.mp3: CEがたまってエクステンション選択に入る音。
+- Audio/SE/2_area_damage.mp3: 貫通・散弾・拡散系の発射音。サークル系は鳴らしません。
+
+### Audio UI
+- ゲーム中の「音量」ボタンからBGM音量、SE音量、ミュートを調整できます。
+- 設定はlocalStorageに保存されます。
