@@ -72,7 +72,7 @@ body.stick-right #pauseBtn { left: calc(var(--game-left, 0px) + 22px); }
 .upgrade-card img { width: 42px; height: 42px; object-fit: contain; display: block; margin-bottom: 8px; }
 .oni-hud { color: #ff4b4b !important; text-shadow: 0 0 10px rgba(255,75,75,0.8); }
 .result-panel { position: relative; overflow: hidden; }
-.gold-fx { position: absolute; inset: 0; pointer-events: none; opacity: 0.9; background:
+.gold-fx { display: none; position: absolute; inset: 0; pointer-events: none; opacity: 0.9; background:
   radial-gradient(circle at 18% 22%, rgba(255, 231, 102, 0.28), transparent 4%),
   radial-gradient(circle at 78% 18%, rgba(255, 209, 102, 0.24), transparent 4%),
   radial-gradient(circle at 48% 8%, rgba(255, 255, 255, 0.20), transparent 3%),
@@ -80,8 +80,9 @@ body.stick-right #pauseBtn { left: calc(var(--game-left, 0px) + 22px); }
   radial-gradient(circle at 86% 66%, rgba(255, 209, 102, 0.18), transparent 5%);
   animation: goldPulse 1.4s ease-in-out infinite alternate;
 }
-.result-panel::before { content: ""; position: absolute; top: 14px; right: 18px; width: 68px; height: 52px; border-radius: 10px 10px 14px 14px; background: linear-gradient(to left top, #ffe766, #998100); box-shadow: 0 0 22px rgba(255, 231, 102, 0.45); opacity: 0.88; }
-.result-panel::after { content: "RARE DROP"; position: absolute; top: 73px; right: 15px; font-size: 10px; font-weight: 900; color: #ffe766; letter-spacing: 0.06em; }
+.result-panel.fallback-gold .gold-fx { display: block; }
+.result-panel.fallback-gold::before { content: ""; position: absolute; top: 14px; right: 18px; width: 68px; height: 52px; border-radius: 10px 10px 14px 14px; background: linear-gradient(to left top, #ffe766, #998100); box-shadow: 0 0 22px rgba(255, 231, 102, 0.45); opacity: 0.88; }
+.result-panel.fallback-gold::after { content: "GOLD CHEST"; position: absolute; top: 73px; right: 15px; font-size: 10px; font-weight: 900; color: #ffe766; letter-spacing: 0.06em; }
 @keyframes goldPulse { from { transform: translateY(0); opacity: 0.55; } to { transform: translateY(-4px); opacity: 0.95; } }
 
 /* v5.2: upgrade/evolution visibility and mobile result safety */
@@ -169,7 +170,7 @@ body.stick-right #pauseBtn { left: calc(var(--game-left, 0px) + 22px); }
   overflow: auto;
   padding-bottom: max(24px, env(safe-area-inset-bottom));
 }
-.result-panel::after {
+.result-panel.fallback-gold::after {
   content: "GOLD CHEST";
   top: 70px;
   right: 12px;
@@ -187,8 +188,8 @@ body.stick-right #pauseBtn { left: calc(var(--game-left, 0px) + 22px); }
   .level-pill { font-size: 11px; padding: 3px 7px; }
   .evo-box { padding: 8px; }
   .result-panel { width: 94vw; max-height: 88dvh; padding: 16px; }
-  .result-panel::before { width: 52px; height: 40px; top: 10px; right: 12px; opacity: 0.75; }
-  .result-panel::after { top: 54px; right: 8px; font-size: 8px; }
+  .result-panel.fallback-gold::before { width: 52px; height: 40px; top: 10px; right: 12px; opacity: 0.75; }
+  .result-panel.fallback-gold::after { top: 54px; right: 8px; font-size: 8px; }
   .result-stats { grid-template-columns: 1fr; gap: 8px; }
   .result-stats div { padding: 9px; }
   .result-panel .actions { position: sticky; bottom: 0; padding: 10px 0 0; background: linear-gradient(to top, rgba(18,23,38,0.98), rgba(18,23,38,0)); }

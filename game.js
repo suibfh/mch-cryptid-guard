@@ -197,6 +197,7 @@
 
   function setScreen(name) {
     Object.values(screens).forEach(el => el.classList.remove("active"));
+    if (screens.result) screens.result.classList.remove("fallback-gold");
     if (name === "upgrade") {
       screens.game.classList.add("active");
       screens.upgrade.classList.add("active");
@@ -842,7 +843,27 @@
     `;
     updateBestText();
     setScreen("result");
+    triggerGoldChestEffect();
   }
+
+  function triggerGoldChestEffect() {
+    const panel = screens.result;
+    if (!panel) return;
+    panel.classList.remove("fallback-gold");
+    window.setTimeout(() => {
+      const modal = window.GoldChestModal;
+      if (modal && typeof modal.show === "function") {
+        try {
+          modal.show();
+          return;
+        } catch (err) {
+          console.warn("GoldChestModal.show() failed. Using fallback effect.", err);
+        }
+      }
+      panel.classList.add("fallback-gold");
+    }, 120);
+  }
+
 
   function draw() {
     if (!state) return;
