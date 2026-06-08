@@ -666,8 +666,71 @@
     return [...evos, ...base].join(" / ") || "なし";
   }
 
+  function evolutionProgressForUpgrade(s, upgradeId) {
+    const after = { ...(s.upgradeCounts || {}) };
+    after[upgradeId] = (after[upgradeId] || 0) + 1;
+    const list = [];
+
+    function entry(evoId, mainId, mainNeed, subId, subNeed) {
+      const evo = evolutionDefs[evoId];
+      if (!evo || s.evolutions[evoId]) return;
+      const nowMain = s.upgradeCounts[mainId] || 0;
+      const nowSub = s.upgradeCounts[subId] || 0;
+      const nextMain = after[mainId] || 0;
+      const nextSub = after[subId] || 0;
+      const willEvolve = nextMain >= mainNeed && nextSub >= subNeed;
+      const touches = upgradeId === mainId || upgradeId === subId || nowMain > 0 || nowSub > 0;
+      if (!touches) return;
+      const beforeTotal = Math.min(nowMain, mainNeed) + Math.min(nowSub, subNeed);
+      const afterTotal = Math.min(nextMain, mainNeed) + Math.min(nextSub, subNeed);
+      const totalNeed = mainNeed + subNeed;
+      const missing = [];
+      if (nextMain < mainNeed) missing.push(`${upgrades[mainId].name}Lv${mainNeed}`);
+      if (nextSub < subNeed) missing.push(`${upgrades[subId].name}Lv${subNeed}`);
+      list.push({
+        evoId,
+        name: evo.name,
+        asset: evo.asset,
+        willEvolve,
+        beforeTotal,
+        afterTotal,
+        totalNeed,
+        missing: missing.join(" + "),
+        line: `${upgrades[mainId].name}Lv${nextMain}/${mainNeed} + ${upgrades[subId].name}Lv${nextSub}/${subNeed}`
+      });
+    }
+
+    entry("holyShot", "shotgun", 3, "range", 1);
+    entry("pierceShotgun", "pierce", 3, "shotgun", 2);
+    entry("whirlOrbit", "orbit", 3, "haste", 1);
+    entry("sanctuary", "wall", 3, "slow", 1);
+    return list.sort((a, b) => Number(b.willEvolve) - Number(a.willEvolve) || b.afterTotal - a.afterTotal);
+  }
+
+  function nearEvolutionCandidateIds(s) {
+    const ids = new Set();
+    const c = s.upgradeCounts || {};
+    const addIfClose = (evoId, mainId, mainNeed, subId, subNeed) => {
+      if (s.evolutions[evoId]) return;
+      const main = c[mainId] || 0;
+      const sub = c[subId] || 0;
+      const progress = Math.min(main, mainNeed) + Math.min(sub, subNeed);
+      const total = mainNeed + subNeed;
+      if (progress >= total - 2) {
+        if (main < mainNeed) ids.add(mainId);
+        if (sub < subNeed) ids.add(subId);
+      }
+    };
+    addIfClose("holyShot", "shotgun", 3, "range", 1);
+    addIfClose("pierceShotgun", "pierce", 3, "shotgun", 2);
+    addIfClose("whirlOrbit", "orbit", 3, "haste", 1);
+    addIfClose("sanctuary", "wall", 3, "slow", 1);
+    return Array.from(ids);
+  }
+
   function chooseUpgradeCandidates(s) {
     const ids = new Set();
+    for (const id of nearEvolutionCandidateIds(s)) ids.add(id);
     if (s.cryptid.hp < 55) ids.add("heal");
     if (s.enemies.length > 24) ids.add("orbit");
     if (s.enemies.length > 18) ids.add("shotgun");
@@ -678,32 +741,60 @@
     return Array.from(ids).slice(0, 3);
   }
 
+  function buildUpgradeCard(id) {
+    const u = upgrades[id];
+    const current = state.upgradeCounts[id] || 0;
+    const next = current + 1;
+    const progress = evolutionProgressForUpgrade(state, id);
+    const will = progress.find(p => p.willEvolve);
+    const best = will || progress[0];
+    const btn = document.createElement("button");
+    btn.className = "upgrade-card" + (will ? " will-evolve" : best ? " has-evo-progress" : "");
+
+    const img = u.asset ? `<img class="upgrade-img" src="${u.asset}" alt="${u.name}" onerror="this.style.display='none'" draggable="false">` : "";
+    const level = `<span class="level-pill">Lv${current} → Lv${next}</span>`;
+    let evoHtml = "";
+    if (will) {
+      evoHtml = `<div class="evo-box ready">${will.asset ? `<img src="${will.asset}" alt="${will.name}" onerror="this.style.display='none'" draggable="false">` : ""}<div><b>進化確定</b><span>${will.name}</span></div></div>`;
+    } else if (best) {
+      evoHtml = `<div class="evo-box"><div><b>進化候補</b><span>${best.name}: ${best.afterTotal}/${best.totalNeed}</span><small>必要: ${best.missing || "条件達成"}</small></div></div>`;
+    }
+    btn.innerHTML = `${img}<div class="upgrade-title"><b>${u.name}</b>${level}</div><small>${u.desc}</small>${evoHtml}`;
+    btn.addEventListener("click", () => {
+      u.apply(state);
+      state.upgradeCounts[id] = (state.upgradeCounts[id] || 0) + 1;
+      state.stats.upgrades++;
+      checkEvolutions(state);
+      state.ce -= state.ceNeed;
+      state.ceNeed = Math.floor(state.ceNeed * 1.15 + 3);
+      pausedForUpgrade = false;
+      screens.upgrade.classList.remove("active");
+      mode = "game";
+      updateUI(state);
+      last = performance.now();
+      requestAnimationFrame(loop);
+    });
+    return btn;
+  }
+
+  function upgradeSummaryText(s) {
+    const near = nearEvolutionCandidateIds(s);
+    const readyNames = [];
+    for (const id of Object.keys(upgrades)) {
+      const will = evolutionProgressForUpgrade(s, id).find(p => p.willEvolve);
+      if (will) readyNames.push(`${upgrades[id].name}で${will.name}`);
+    }
+    if (readyNames.length) return `進化間近: ${readyNames.slice(0, 2).join(" / ")}`;
+    if (near.length) return `進化に近い加護を候補に含めています。Lv表示と必要素材を見て選べます。`;
+    return s.cryptid.hp < 45 ? "ヨシュカが危険です。守りを厚くする候補を含めています。" : "加護を選ぶとLvが上がります。組み合わせ条件を満たすと上位エクステへ進化します。";
+  }
+
   function openUpgrade() {
     pausedForUpgrade = true;
     const candidates = chooseUpgradeCandidates(state);
     ui.upgradeOptions.innerHTML = "";
-    ui.upgradeHint.textContent = state.cryptid.hp < 45 ? "ヨシュカが危険です。守りを厚くする候補を含めています。" : "現在の敵構成を見て候補を出しています。";
-    for (const id of candidates) {
-      const u = upgrades[id];
-      const btn = document.createElement("button");
-      btn.className = "upgrade-card";
-      btn.innerHTML = `${u.asset ? `<img src="${u.asset}" alt="${u.name}" onerror="this.style.display='none'" draggable="false">` : ""}<b>${u.name}</b><small>${u.desc}</small>`;
-      btn.addEventListener("click", () => {
-        u.apply(state);
-        state.upgradeCounts[id] = (state.upgradeCounts[id] || 0) + 1;
-        state.stats.upgrades++;
-        checkEvolutions(state);
-        state.ce -= state.ceNeed;
-        state.ceNeed = Math.floor(state.ceNeed * 1.15 + 3);
-        pausedForUpgrade = false;
-        screens.upgrade.classList.remove("active");
-        mode = "game";
-        updateUI(state);
-        last = performance.now();
-        requestAnimationFrame(loop);
-      });
-      ui.upgradeOptions.appendChild(btn);
-    }
+    ui.upgradeHint.textContent = upgradeSummaryText(state);
+    for (const id of candidates) ui.upgradeOptions.appendChild(buildUpgradeCard(id));
     setScreen("upgrade");
   }
 
