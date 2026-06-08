@@ -137,12 +137,14 @@
     for (const [id, path] of Object.entries(audioPaths.bgm)) {
       const a = new Audio(path);
       a.preload = "auto";
+      a.setAttribute("playsinline", "");
       a.volume = 0;
       audioState.bgm[id] = a;
     }
     for (const [id, path] of Object.entries(audioPaths.se)) {
       const a = new Audio(path);
       a.preload = "auto";
+      a.setAttribute("playsinline", "");
       a.volume = 0;
       audioState.se[id] = a;
     }
@@ -172,35 +174,18 @@
     try {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (AC && !audioState.audioCtx) audioState.audioCtx = new AC();
-      if (audioState.audioCtx && audioState.audioCtx.state !== "running") audioState.audioCtx.resume().catch(() => {});
-      prepareSeBuffers();
-
-      // Once audio is unlocked, do not run the silent play/pause probe again.
-      // Re-running it while BGM is playing pauses the current track on mobile/desktop.
-      if (audioState.unlocked) {
-        applyAudioVolumes();
-        return;
+      if (audioState.audioCtx && audioState.audioCtx.state !== "running") {
+        audioState.audioCtx.resume().catch(() => {});
       }
-
-      for (const a of [...Object.values(audioState.bgm), ...Object.values(audioState.se)]) {
-        try {
-          const oldMuted = a.muted;
-          const oldVol = a.volume;
-          const oldTime = a.currentTime || 0;
-          const wasPaused = a.paused;
-          a.muted = true;
-          a.volume = 0;
-          const pr = a.play();
-          if (pr && pr.catch) pr.catch(() => {});
-          a.pause();
-          a.currentTime = wasPaused ? 0 : oldTime;
-          a.muted = oldMuted;
-          a.volume = oldVol;
-        } catch {}
-      }
+      // Do not run a silent play/pause probe here. On iOS/desktop this can
+      // interrupt BGM and can also consume the user gesture before the real play().
       audioState.unlocked = true;
       applyAudioVolumes();
-    } catch {}
+      prepareSeBuffers();
+    } catch {
+      audioState.unlocked = true;
+      applyAudioVolumes();
+    }
   }
 
   function syncAudioControls() {
@@ -225,6 +210,7 @@
 
   function playBgm(id, loop = true) {
     initAudio();
+    if (!audioState.unlocked) unlockAudio();
     const a = audioState.bgm[id];
     if (!a) return;
     if (audioState.currentBgm === a && !a.paused) return;
@@ -240,6 +226,7 @@
 
   function playSe(id, cooldown = 0.08) {
     initAudio();
+    if (!audioState.unlocked) unlockAudio();
     if (audioState.settings.muted) return;
     const now = performance.now();
     if ((audioState.lastSe[id] || 0) + cooldown * 1000 > now) return;
@@ -1393,18 +1380,25 @@
   document.getElementById("howBtn").addEventListener("click", () => setScreen("how"));
   if (ui.stickSideBtn) ui.stickSideBtn.addEventListener("click", toggleStickSide);
   document.getElementById("backBtn").addEventListener("click", () => setScreen("start"));
-  document.getElementById("retryBtn").addEventListener("click", newGame);
+  document.getElementById("retryBtn").addEventListener("click", () => { unlockAudio(); newGame(); });
   document.getElementById("titleBtn").addEventListener("click", () => { stopAllBgm(); updateBestText(); setScreen("start"); });
   document.getElementById("pauseBtn").addEventListener("click", () => { if (!state || pausedForUpgrade) return; state.paused = !state.paused; last = performance.now(); if (!state.paused) requestAnimationFrame(loop); draw(); });
   if (ui.goldChestBtn) ui.goldChestBtn.addEventListener("click", showGoldChest);
-  function updateBgmVolumeFromUi(e) { if (e) e.stopPropagation(); initAudio(); audioState.settings.bgm = Number(ui.bgmVolume.value) / 100; saveAudioSettings(); applyAudioVolumes(); }
-  function updateSeVolumeFromUi(e) { if (e) e.stopPropagation(); initAudio(); audioState.settings.se = Number(ui.seVolume.value) / 100; saveAudioSettings(); applyAudioVolumes(); }
-  let lastAudioUiTap = 0;
-  let lastMuteUiTap = 0;
+  function updateBgmVolumeFromUi(e) {
+    if (e) e.stopPropagation();
+    initAudio();
+    audioState.settings.bgm = Number(ui.bgmVolume.value) / 100;
+    saveAudioSettings();
+    applyAudioVolumes();
+  }
+  function updateSeVolumeFromUi(e) {
+    if (e) e.stopPropagation();
+    initAudio();
+    audioState.settings.se = Number(ui.seVolume.value) / 100;
+    saveAudioSettings();
+    applyAudioVolumes();
+  }
   function toggleMuteFromUi(e) {
-    const now = performance.now();
-    if (now - lastMuteUiTap < 260) { if (e) { e.preventDefault(); e.stopPropagation(); } return; }
-    lastMuteUiTap = now;
     if (e) { e.preventDefault(); e.stopPropagation(); }
     unlockAudio();
     audioState.settings.muted = !audioState.settings.muted;
@@ -1412,26 +1406,30 @@
     applyAudioVolumes();
   }
   function openAudioFromUi(e) {
-    const now = performance.now();
-    if (now - lastAudioUiTap < 260) { if (e) { e.preventDefault(); e.stopPropagation(); } return; }
-    lastAudioUiTap = now;
     if (e) { e.preventDefault(); e.stopPropagation(); }
     unlockAudio();
     toggleAudioPanel();
   }
-  if (ui.audioBtn) {
-    ui.audioBtn.addEventListener("click", openAudioFromUi);
-    ui.audioBtn.addEventListener("touchend", openAudioFromUi, { passive: false });
-    ui.audioBtn.addEventListener("pointerup", openAudioFromUi);
+  function bindTap(el, fn) {
+    if (!el) return;
+    let last = 0;
+    const handler = (e) => {
+      const now = performance.now();
+      if (now - last < 320) { if (e) { e.preventDefault(); e.stopPropagation(); } return; }
+      last = now;
+      fn(e);
+    };
+    if (window.PointerEvent) el.addEventListener("pointerup", handler, { passive: false });
+    else {
+      el.addEventListener("touchend", handler, { passive: false });
+      el.addEventListener("click", handler);
+    }
   }
-  if (ui.bgmVolume) ["input", "change", "touchend", "pointerup"].forEach(type => ui.bgmVolume.addEventListener(type, updateBgmVolumeFromUi, { passive: true }));
-  if (ui.seVolume) ["input", "change", "touchend", "pointerup"].forEach(type => ui.seVolume.addEventListener(type, updateSeVolumeFromUi, { passive: true }));
-  if (ui.muteBtn) {
-    ui.muteBtn.addEventListener("click", toggleMuteFromUi);
-    ui.muteBtn.addEventListener("touchend", toggleMuteFromUi, { passive: false });
-    ui.muteBtn.addEventListener("pointerup", toggleMuteFromUi);
-  }
-  if (ui.audioPanel) ["pointerdown", "pointermove", "pointerup", "touchstart", "touchmove", "touchend", "click"].forEach(type => ui.audioPanel.addEventListener(type, e => { e.stopPropagation(); }, { passive: true }));
+  bindTap(ui.audioBtn, openAudioFromUi);
+  if (ui.bgmVolume) ["input", "change"].forEach(type => ui.bgmVolume.addEventListener(type, updateBgmVolumeFromUi));
+  if (ui.seVolume) ["input", "change"].forEach(type => ui.seVolume.addEventListener(type, updateSeVolumeFromUi));
+  bindTap(ui.muteBtn, toggleMuteFromUi);
+  if (ui.audioPanel) ["pointerdown", "pointermove", "pointerup", "touchstart", "touchmove", "touchend", "click"].forEach(type => ui.audioPanel.addEventListener(type, e => { e.stopPropagation(); }, { passive: false }));
   window.addEventListener("pointerdown", unlockAudio, { once: true, passive: true });
   window.addEventListener("touchstart", unlockAudio, { once: true, passive: true });
 
