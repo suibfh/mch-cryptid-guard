@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const STORAGE_KEY = "mch_cryptid_guard_test_v3";
+  const STORAGE_KEY = "mch_cryptid_guard_test_v4";
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
 
@@ -98,6 +98,30 @@
     shield: { name: "緊急盾", desc: "大きな被害を一度だけ防ぐ盾を得る。", apply: s => s.cryptid.shields++ },
   };
 
+
+  const evolutionDefs = {
+    holyShot: {
+      name: "拡散聖弾",
+      condition: s => (s.upgradeCounts.shotgun || 0) >= 3 && (s.upgradeCounts.range || 0) >= 1,
+      desc: "散弾Lv3 + 索敵拡張Lv1。散弾の弾数、射程、広がりが上がる。"
+    },
+    pierceShotgun: {
+      name: "貫通散弾",
+      condition: s => (s.upgradeCounts.pierce || 0) >= 3 && (s.upgradeCounts.shotgun || 0) >= 2,
+      desc: "貫通弾Lv3 + 散弾Lv2。散弾の一部が敵を貫通する。"
+    },
+    whirlOrbit: {
+      name: "旋風リング",
+      condition: s => (s.upgradeCounts.orbit || 0) >= 3 && (s.upgradeCounts.haste || 0) >= 1,
+      desc: "護衛リングLv3 + 俊足Lv1。リングが増え、当たった敵を少し押し返す。"
+    },
+    sanctuary: {
+      name: "聖域結界",
+      condition: s => (s.upgradeCounts.wall || 0) >= 3 && (s.upgradeCounts.slow || 0) >= 1,
+      desc: "結界Lv3 + 遅滞領域Lv1。クリプタイド周辺に防衛領域を作る。"
+    },
+  };
+
   function setScreen(name) {
     Object.values(screens).forEach(el => el.classList.remove("active"));
     if (name === "upgrade") {
@@ -142,6 +166,8 @@
       keys: {},
       stats: { enemyScore: 0, ceScore: 0, clearBonus: 0, hpBonus: 0, killBonus: 0, ceCollected: 0, upgrades: 0 },
       upgradeCounts: {},
+      evolutions: {},
+      evolutionBanner: null,
       stick: { active: false, x: 0, y: 0 },
       player: { x: W / 2, y: H / 2 + 118, r: 14, ...base, fire: 0, orbits: base.aura ? 1 : 0, pierce: 0, ceBurst: 0, shotgun: 0 },
       cryptid: { x: W / 2, y: H / 2, r: 32, hp: 100, maxHp: 100, wall: 0, slow: 0, shields: 1, hitFlash: 0 },
@@ -283,6 +309,27 @@
     return best;
   }
 
+  function canHit(e, key, t, cooldown) {
+    if (!e.hitTimers) e.hitTimers = {};
+    if ((e.hitTimers[key] || 0) > t) return false;
+    e.hitTimers[key] = t + cooldown;
+    return true;
+  }
+
+  function pushEnemyAway(e, source, power) {
+    const a = Math.atan2(e.y - source.y, e.x - source.x);
+    e.x = clamp(e.x + Math.cos(a) * power, -60, W + 60);
+    e.y = clamp(e.y + Math.sin(a) * power, -60, H + 60);
+  }
+
+  function effectiveOrbitCount(s) {
+    return s.player.orbits + (s.evolutions.whirlOrbit ? 2 : 0);
+  }
+
+  function effectiveWallCount(s) {
+    return s.cryptid.wall + (s.evolutions.sanctuary ? 2 : 0);
+  }
+
   function updatePlayerFire(s, dt) {
     s.player.fire -= dt;
     if (s.player.fire <= 0) {
@@ -295,13 +342,21 @@
         s.player.fire = 0.08;
       }
     }
-    for (let i = 0; i < s.player.orbits; i++) {
-      const a = s.t * (1.8 + i * 0.13) + (Math.PI * 2 * i) / Math.max(1, s.player.orbits);
+    const orbitCount = effectiveOrbitCount(s);
+    const orbitSpeed = s.evolutions.whirlOrbit ? 2.75 : 1.85;
+    const orbitDamage = s.evolutions.whirlOrbit ? 10 : 7;
+    const orbitCooldown = s.evolutions.whirlOrbit ? 0.22 : 0.28;
+    const orbitHitRange = s.evolutions.whirlOrbit ? 17 : 14;
+    for (let i = 0; i < orbitCount; i++) {
+      const a = s.t * (orbitSpeed + i * 0.12) + (Math.PI * 2 * i) / Math.max(1, orbitCount);
       const ox = s.player.x + Math.cos(a) * 42;
       const oy = s.player.y + Math.sin(a) * 42;
       for (const e of s.enemies) {
-        if (Math.hypot(e.x - ox, e.y - oy) < e.r + 9) {
-          e.hp -= 18 * dt;
+        const key = `orbit${i}`;
+        if (Math.hypot(e.x - ox, e.y - oy) < e.r + orbitHitRange && canHit(e, key, s.t, orbitCooldown)) {
+          e.hp -= orbitDamage;
+          if (s.evolutions.whirlOrbit) pushEnemyAway(e, s.player, 18);
+          s.floaters.push({ x: e.x, y: e.y - e.r, text: `-${orbitDamage}`, life: 0.35, color: "#ffd166" });
         }
       }
     }
@@ -312,24 +367,58 @@
     const baseDamage = s.player.damage * piercePenalty;
     s.bullets.push({ x: s.player.x, y: s.player.y, vx: Math.cos(a) * 400, vy: Math.sin(a) * 400, r: 5, damage: baseDamage, life: 1.22, pierce: s.player.pierce, color: s.player.color, owner: "player" });
     if (s.player.shotgun > 0) {
-      const pellets = Math.min(2 + s.player.shotgun * 2, 8);
-      const spread = Math.min(0.32 + s.player.shotgun * 0.06, 0.62);
+      let pellets = Math.min(2 + s.player.shotgun * 2, 8);
+      let spread = Math.min(0.32 + s.player.shotgun * 0.06, 0.62);
+      let pelletSpeed = 340;
+      let pelletLife = 0.78;
+      let pelletDamage = 6 + s.player.shotgun * 1.2;
+      let pelletPierce = 0;
+      let pelletColor = "#ffd166";
+      if (s.evolutions.holyShot) {
+        pellets += 2;
+        spread += 0.16;
+        pelletSpeed += 34;
+        pelletLife += 0.18;
+        pelletDamage += 1.2;
+        pelletColor = "#fff0a6";
+      }
+      if (s.evolutions.pierceShotgun) {
+        pelletPierce = 1;
+        pelletDamage *= 0.9;
+        pelletColor = "#ffdf7e";
+      }
       for (let i = 0; i < pellets; i++) {
         const t = pellets === 1 ? 0 : i / (pellets - 1);
         const aa = a - spread / 2 + spread * t;
-        s.bullets.push({ x: s.player.x, y: s.player.y, vx: Math.cos(aa) * 340, vy: Math.sin(aa) * 340, r: 4, damage: 6 + s.player.shotgun * 1.2, life: 0.78, pierce: 0, color: "#ffd166", owner: "player" });
+        s.bullets.push({ x: s.player.x, y: s.player.y, vx: Math.cos(aa) * pelletSpeed, vy: Math.sin(aa) * pelletSpeed, r: 4, damage: pelletDamage, life: pelletLife, pierce: pelletPierce, color: pelletColor, owner: "player" });
       }
     }
   }
 
   function updateCryptidDefense(s, dt) {
     if (s.cryptid.hitFlash > 0) s.cryptid.hitFlash -= dt;
-    for (let i = 0; i < s.cryptid.wall; i++) {
-      const a = -s.t * (1.2 + i * 0.05) + (Math.PI * 2 * i) / Math.max(1, s.cryptid.wall);
+    const wallCount = effectiveWallCount(s);
+    const wallDamage = s.evolutions.sanctuary ? 10 : 8;
+    const wallCooldown = s.evolutions.sanctuary ? 0.22 : 0.25;
+    const wallHitRange = s.evolutions.sanctuary ? 16 : 13;
+    for (let i = 0; i < wallCount; i++) {
+      const a = -s.t * (1.35 + i * 0.06) + (Math.PI * 2 * i) / Math.max(1, wallCount);
       const ox = s.cryptid.x + Math.cos(a) * 56;
       const oy = s.cryptid.y + Math.sin(a) * 56;
       for (const e of s.enemies) {
-        if (Math.hypot(e.x - ox, e.y - oy) < e.r + 8) e.hp -= 22 * dt;
+        const key = `wall${i}`;
+        if (Math.hypot(e.x - ox, e.y - oy) < e.r + wallHitRange && canHit(e, key, s.t, wallCooldown)) {
+          e.hp -= wallDamage;
+          s.floaters.push({ x: e.x, y: e.y - e.r, text: `-${wallDamage}`, life: 0.35, color: "#83d6ff" });
+        }
+      }
+    }
+    if (s.evolutions.sanctuary) {
+      for (const e of s.enemies) {
+        if (Math.hypot(e.x - s.cryptid.x, e.y - s.cryptid.y) < 124 && canHit(e, "sanctuary", s.t, 0.48)) {
+          e.hp -= 6;
+          s.floaters.push({ x: e.x, y: e.y - e.r, text: "聖域", life: 0.35, color: "#83d6ff" });
+        }
       }
     }
   }
@@ -454,10 +543,35 @@
     }
   }
   function updateFloaters(s, dt) {
+    if (s.evolutionBanner) {
+      s.evolutionBanner.life -= dt;
+      if (s.evolutionBanner.life <= 0) s.evolutionBanner = null;
+    }
     for (let i = s.floaters.length - 1; i >= 0; i--) {
       const f = s.floaters[i]; f.life -= dt; f.y -= 30 * dt;
       if (f.life <= 0) s.floaters.splice(i, 1);
     }
+  }
+
+  function checkEvolutions(s) {
+    for (const [id, evo] of Object.entries(evolutionDefs)) {
+      if (!s.evolutions[id] && evo.condition(s)) {
+        s.evolutions[id] = true;
+        const text = `EVOLUTION! ${evo.name}`;
+        s.evolutionBanner = { text, life: 2.2 };
+        s.floaters.push({ x: W / 2, y: 92, text, life: 2.0, color: "#ffd166" });
+      }
+    }
+  }
+
+  function buildText(s) {
+    const base = Object.entries(s.upgradeCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([id, n]) => `${upgrades[id].name}-${n}`);
+    const evos = Object.entries(s.evolutions || {})
+      .filter(([, v]) => v)
+      .map(([id]) => evolutionDefs[id].name);
+    return [...evos, ...base].join(" / ") || "なし";
   }
 
   function chooseUpgradeCandidates(s) {
@@ -486,6 +600,7 @@
         u.apply(state);
         state.upgradeCounts[id] = (state.upgradeCounts[id] || 0) + 1;
         state.stats.upgrades++;
+        checkEvolutions(state);
         state.ce -= state.ceNeed;
         state.ceNeed = Math.floor(state.ceNeed * 1.15 + 3);
         pausedForUpgrade = false;
@@ -521,10 +636,7 @@
     save(saved);
     ui.resultTitle.textContent = win ? "防衛成功" : "防衛失敗";
     ui.resultSummary.textContent = win ? "クリプタイドを守り切りました。" : "クリプタイドが倒されました。次は危険な敵を早めに処理してください。";
-    const build = Object.entries(state.upgradeCounts)
-      .sort((a, b) => b[1] - a[1])
-      .map(([id, n]) => `${upgrades[id].name}-${n}`)
-      .join(" / ") || "なし";
+    const build = buildText(state);
     ui.resultStats.innerHTML = `
       <div><b>スコア</b>${finalScore}</div>
       <div><b>最高スコア</b>${saved.best}</div>
@@ -556,6 +668,7 @@
     drawPlayer(s);
     for (const w of s.warnings) drawWarning(w);
     for (const f of s.floaters) drawFloater(f);
+    if (s.evolutionBanner) drawEvolutionBanner(s.evolutionBanner);
     if (s.paused) drawCenterText("PAUSE");
   }
 
@@ -580,7 +693,9 @@
     ctx.strokeStyle = "#83d6ff"; ctx.lineWidth = 3; ctx.stroke();
     ctx.fillStyle = "#fff"; ctx.font = "24px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("◇", c.x, c.y + 1);
     if (c.slow > 0) { ctx.globalAlpha = 0.12; circle(c.x, c.y, 120, "#83d6ff"); }
-    for (let i = 0; i < c.wall; i++) { const a = -s.t * (1.2 + i * 0.05) + (Math.PI * 2 * i) / Math.max(1, c.wall); circle(c.x + Math.cos(a)*56, c.y + Math.sin(a)*56, 8, "#83d6ff"); }
+    const wallCount = effectiveWallCount(s);
+    for (let i = 0; i < wallCount; i++) { const a = -s.t * (1.35 + i * 0.06) + (Math.PI * 2 * i) / Math.max(1, wallCount); circle(c.x + Math.cos(a)*56, c.y + Math.sin(a)*56, 8, s.evolutions.sanctuary ? "#b8f7ff" : "#83d6ff"); }
+    if (s.evolutions.sanctuary) { ctx.globalAlpha = 0.1; circle(c.x, c.y, 124, "#b8f7ff"); ctx.globalAlpha = 1; }
     ctx.restore();
   }
   function drawPlayer(s) {
@@ -590,7 +705,8 @@
     circle(p.x, p.y, p.r, p.color);
     ctx.fillStyle = "#06101a"; ctx.font = "20px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(p.icon, p.x, p.y + 1);
     ctx.globalAlpha = 0.12; circle(p.x, p.y, p.range, p.color); ctx.globalAlpha = 1;
-    for (let i = 0; i < p.orbits; i++) { const a = s.t*(1.8+i*0.13)+(Math.PI*2*i)/Math.max(1,p.orbits); circle(p.x+Math.cos(a)*42, p.y+Math.sin(a)*42, 7, "#ffd166"); }
+    const orbitCount = effectiveOrbitCount(s);
+    for (let i = 0; i < orbitCount; i++) { const a = s.t*((s.evolutions.whirlOrbit ? 2.75 : 1.85)+i*0.12)+(Math.PI*2*i)/Math.max(1,orbitCount); circle(p.x+Math.cos(a)*42, p.y+Math.sin(a)*42, 7, s.evolutions.whirlOrbit ? "#ffe8a3" : "#ffd166"); }
     ctx.restore();
   }
   function drawEnemy(e) {
@@ -608,6 +724,18 @@
     ctx.save(); ctx.globalAlpha = clamp(w.life, 0, 1); ctx.fillStyle = w.color; ctx.font = "bold 16px system-ui"; ctx.textAlign = "center"; ctx.fillText(w.text, w.x, w.y); ctx.restore();
   }
   function drawFloater(f) { ctx.save(); ctx.globalAlpha = clamp(f.life,0,1); ctx.fillStyle = f.color; ctx.font = "bold 15px system-ui"; ctx.textAlign = "center"; ctx.fillText(f.text, f.x, f.y); ctx.restore(); }
+  function drawEvolutionBanner(b) {
+    ctx.save();
+    const alpha = clamp(b.life, 0, 1);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = "rgba(0,0,0,0.52)";
+    ctx.strokeStyle = "#ffd166";
+    ctx.lineWidth = 2;
+    const x = W / 2 - 220, y = 58, w = 440, h = 48;
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, 14); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#ffd166"; ctx.font = "bold 22px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(b.text, W / 2, y + h / 2);
+    ctx.restore();
+  }
   function drawCenterText(text) { ctx.fillStyle = "rgba(0,0,0,0.45)"; ctx.fillRect(0,0,W,H); ctx.fillStyle = "#fff"; ctx.font = "bold 42px system-ui"; ctx.textAlign = "center"; ctx.fillText(text, W/2, H/2); }
 
   function loop(now) {
