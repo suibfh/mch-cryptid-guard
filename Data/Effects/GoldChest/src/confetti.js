@@ -230,4 +230,4 @@ let confetti = {
   }
 })()
 
-export default confetti
+window.confetti = confetti
