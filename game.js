@@ -415,7 +415,7 @@
   // スマホ操作は、ゲーム画面のどこでも使える仮想スティック方式です。
 
   const heroDefs = {
-    balanced: { name: "グリム兄弟", role: "標準・安定型", asset: assetPaths.heroes.balanced, icon: "⚔", speed: 210, range: 165, fireRate: 0.68, damage: 14, color: "#83d6ff", magnet: 100, initialUpgrades: ["shield"], skill: "初期エクステ: シールドLv1。最初の事故を防ぎやすい。" },
+    balanced: { name: "グリム兄弟", role: "標準・散弾型", asset: assetPaths.heroes.balanced, icon: "⚔", speed: 210, range: 165, fireRate: 0.68, damage: 14, color: "#83d6ff", magnet: 100, initialUpgrades: ["shotgun"], skill: "初期エクステ: フレイルLv1。散弾で序盤から敵を処理しやすい。" },
     swift: { name: "ジャックザリッパー", role: "高速・回収型", asset: assetPaths.heroes.swift, icon: "✦", speed: 252, range: 145, fireRate: 0.62, damage: 11, color: "#91f0aa", magnet: 130, initialUpgrades: ["haste"], skill: "初期エクステ: ブーツLv1。移動とCE回収がさらに速い。" },
     guardian: { name: "スパルタクス", role: "防衛・重火力型", asset: assetPaths.heroes.guardian, icon: "◆", speed: 182, range: 150, fireRate: 0.88, damage: 28, color: "#ffd166", magnet: 92, initialUpgrades: ["orbit"], skill: "初期エクステ: チャクラムLv1。攻撃は遅いが一撃が重い。" },
     sage: { name: "ライト兄弟", role: "遠距離・支援型", asset: assetPaths.heroes.sage, icon: "☄", speed: 192, range: 215, fireRate: 0.78, damage: 18, color: "#c8a2ff", magnet: 98, initialUpgrades: ["pierce"], skill: "初期エクステ: ジャベリンLv1。長い射程で安全に削る。" },
