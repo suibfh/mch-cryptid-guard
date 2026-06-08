@@ -174,16 +174,26 @@
       if (AC && !audioState.audioCtx) audioState.audioCtx = new AC();
       if (audioState.audioCtx && audioState.audioCtx.state !== "running") audioState.audioCtx.resume().catch(() => {});
       prepareSeBuffers();
+
+      // Once audio is unlocked, do not run the silent play/pause probe again.
+      // Re-running it while BGM is playing pauses the current track on mobile/desktop.
+      if (audioState.unlocked) {
+        applyAudioVolumes();
+        return;
+      }
+
       for (const a of [...Object.values(audioState.bgm), ...Object.values(audioState.se)]) {
         try {
           const oldMuted = a.muted;
           const oldVol = a.volume;
+          const oldTime = a.currentTime || 0;
+          const wasPaused = a.paused;
           a.muted = true;
           a.volume = 0;
           const pr = a.play();
           if (pr && pr.catch) pr.catch(() => {});
           a.pause();
-          a.currentTime = 0;
+          a.currentTime = wasPaused ? 0 : oldTime;
           a.muted = oldMuted;
           a.volume = oldVol;
         } catch {}
@@ -477,7 +487,7 @@
     s.cryptid.hp = Math.min(s.cryptid.maxHp, s.cryptid.hp + 18);
     s.evolutionBanner = { text: "鬼TIME", life: 3.0, oni: true };
     s.warnings.push({ x: W / 2, y: 78, text: "鬼TIME", life: 2.2, color: "#ff4b4b" });
-    playBgm("oni", false);
+    playBgm("oni", true);
   }
 
   function currentPhase(t) {
