@@ -3,6 +3,7 @@
 
   const STORAGE_KEY = "mch_yoshka_guard_test_v5";
   const PLAYER_NAME_KEY = "mch_yoshka_guard_player_name";
+  const DEVICE_ID_KEY = "mch_yoshka_guard_device_id";
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
 
@@ -1155,6 +1156,19 @@
     return String(name || "").trim().slice(0, 12);
   }
 
+  function getDeviceId() {
+    let id = localStorage.getItem(DEVICE_ID_KEY);
+    if (!id) {
+      if (window.crypto && typeof window.crypto.randomUUID === "function") {
+        id = window.crypto.randomUUID();
+      } else {
+        id = `dev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
+      }
+      localStorage.setItem(DEVICE_ID_KEY, id);
+    }
+    return id;
+  }
+
   function setRankingMessage(text, isError = false) {
     if (!ui.rankingMessage) return;
     ui.rankingMessage.textContent = text || "";
@@ -1206,11 +1220,11 @@
       const res = await fetch('/api/submit-score', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, score: lastResult.score, hero: lastResult.hero })
+        body: JSON.stringify({ name, score: lastResult.score, hero: lastResult.hero, deviceId: getDeviceId() })
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.ok) throw new Error(json.error || '登録できませんでした。');
-      setRankingMessage('登録しました。');
+      setRankingMessage(json.updated === false ? `自己ベスト未更新です。現在の自己ベスト: ${Number(json.bestScore || 0).toLocaleString()}` : 'ランキングに登録しました。');
       renderLeaderboard(json.rows || [], ui.resultLeaderboard);
     } catch (err) {
       setRankingMessage('登録できませんでした。Vercel公開後に確認してください。', true);
