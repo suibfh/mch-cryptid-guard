@@ -2,7 +2,8 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>MCH Cryptid Guard - Test</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -44,17 +45,17 @@
     <section id="howScreen" class="panel screen">
       <h2>遊び方</h2>
       <p>PCはWASDまたは矢印キーで移動。スマホは画面左下のスティックで移動します。</p>
-      <p>攻撃は自動です。敵を倒すとCEが出ます。CEを集めると加護を選べます。</p>
+      <p>攻撃は自動です。敵を倒すとCEが出ます。CEを集めると加護を選べます。今回の版では最初の加護を取りやすくしています。</p>
       <p>敵は時間で単純に強くなるのではなく、役割が増えます。危険な敵には予告が出ます。</p>
       <div class="actions"><button id="backBtn" class="secondary">戻る</button></div>
     </section>
 
     <section id="gameScreen" class="screen">
-      <canvas id="game" width="960" height="540" aria-label="game canvas"></canvas>
+      <canvas id="game" width="960" height="540" aria-label="game canvas" draggable="false"></canvas>
       <div id="hud">
         <div><b>TIME</b><span id="timeText">03:00</span></div>
         <div><b>CRYPTID</b><span id="hpText">100%</span></div>
-        <div><b>CE</b><span id="ceText">0/12</span></div>
+        <div><b>CE</b><span id="ceText">0/6</span></div>
         <div><b>SCORE</b><span id="scoreText">0</span></div>
       </div>
       <div id="stick" aria-hidden="true"><div id="knob"></div></div>

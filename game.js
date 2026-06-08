@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const STORAGE_KEY = "mch_cryptid_guard_test_v1";
+  const STORAGE_KEY = "mch_cryptid_guard_test_v2";
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
 
@@ -26,6 +26,7 @@
     upgradeHint: document.getElementById("upgradeHint"),
     stick: document.getElementById("stick"),
     knob: document.getElementById("knob"),
+    gameScreen: document.getElementById("gameScreen"),
   };
 
   const W = 960;
@@ -54,18 +55,18 @@
   }
 
   const heroDefs = {
-    balanced: { icon: "⚔", speed: 205, range: 155, fireRate: 0.72, damage: 13, color: "#83d6ff", magnet: 78 },
-    swift: { icon: "✦", speed: 248, range: 135, fireRate: 0.64, damage: 10, color: "#91f0aa", magnet: 108 },
-    guardian: { icon: "◆", speed: 178, range: 145, fireRate: 0.82, damage: 12, color: "#ffd166", magnet: 70, aura: true },
-    sage: { icon: "☄", speed: 188, range: 205, fireRate: 0.92, damage: 17, color: "#c8a2ff", magnet: 76 },
+    balanced: { icon: "⚔", speed: 210, range: 165, fireRate: 0.68, damage: 14, color: "#83d6ff", magnet: 100 },
+    swift: { icon: "✦", speed: 252, range: 145, fireRate: 0.62, damage: 11, color: "#91f0aa", magnet: 130 },
+    guardian: { icon: "◆", speed: 182, range: 150, fireRate: 0.78, damage: 13, color: "#ffd166", magnet: 92, aura: true },
+    sage: { icon: "☄", speed: 192, range: 215, fireRate: 0.88, damage: 18, color: "#c8a2ff", magnet: 98 },
   };
 
   const enemyDefs = {
-    walker: { cost: 1, hp: 24, speed: 42, damage: 5, radius: 12, color: "#ff7979", score: 12 },
-    runner: { cost: 3, hp: 18, speed: 82, damage: 4, radius: 10, color: "#ffb86b", score: 18 },
-    archer: { cost: 5, hp: 28, speed: 28, damage: 4, radius: 12, color: "#f78bd8", score: 28, ranged: true, range: 250, cooldown: 2.6 },
-    splitter: { cost: 6, hp: 44, speed: 34, damage: 6, radius: 15, color: "#a3e635", score: 35, split: true },
-    hexer: { cost: 7, hp: 34, speed: 36, damage: 3, radius: 13, color: "#b58cff", score: 42, debuff: true },
+    walker: { cost: 1, hp: 20, speed: 36, damage: 3, radius: 12, color: "#ff7979", score: 12 },
+    runner: { cost: 3, hp: 16, speed: 70, damage: 3, radius: 10, color: "#ffb86b", score: 18 },
+    archer: { cost: 5, hp: 24, speed: 24, damage: 3, radius: 12, color: "#f78bd8", score: 28, ranged: true, range: 250, cooldown: 2.6 },
+    splitter: { cost: 6, hp: 38, speed: 30, damage: 4, radius: 15, color: "#a3e635", score: 35, split: true },
+    hexer: { cost: 7, hp: 30, speed: 31, damage: 2, radius: 13, color: "#b58cff", score: 42, debuff: true },
   };
 
   const upgrades = {
@@ -98,6 +99,10 @@
     canvas.height = Math.max(1, Math.floor(rect.height * dpr));
     ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
     scale = rect.width / W;
+    document.documentElement.style.setProperty("--game-left", `${rect.left}px`);
+    document.documentElement.style.setProperty("--game-top", `${rect.top}px`);
+    document.documentElement.style.setProperty("--game-width", `${rect.width}px`);
+    document.documentElement.style.setProperty("--game-height", `${rect.height}px`);
   }
 
   function newGame() {
@@ -108,7 +113,7 @@
       score: 0,
       kills: 0,
       ce: 0,
-      ceNeed: 12,
+      ceNeed: 6,
       phase: 0,
       spawnAcc: 0,
       threatMemory: [],
@@ -120,7 +125,7 @@
       keys: {},
       stick: { active: false, x: 0, y: 0 },
       player: { x: W / 2, y: H / 2 + 118, r: 14, ...base, fire: 0, orbits: base.aura ? 1 : 0, pierce: 0, ceBurst: 0 },
-      cryptid: { x: W / 2, y: H / 2, r: 32, hp: 100, maxHp: 100, wall: 0, slow: 0, shields: 0, hitFlash: 0 },
+      cryptid: { x: W / 2, y: H / 2, r: 32, hp: 100, maxHp: 100, wall: 0, slow: 0, shields: 1, hitFlash: 0 },
       paused: false,
       ended: false,
     };
@@ -150,10 +155,12 @@
 
   function spawnBudget(s) {
     const phase = currentPhase(s.t);
-    let budget = 2.2 + phase * 1.18;
-    if (s.cryptid.hp < 35) budget *= 0.68;
-    if (s.enemies.length > 45) budget *= 0.25;
-    if (s.enemies.length > 62) budget = 0;
+    let budget = 0.72 + phase * 0.58;
+    if (s.t < 25) budget *= 0.72;
+    if (s.cryptid.hp < 55) budget *= 0.78;
+    if (s.cryptid.hp < 35) budget *= 0.58;
+    if (s.enemies.length > 28) budget *= 0.35;
+    if (s.enemies.length > 42) budget = 0;
     return budget;
   }
 
@@ -360,7 +367,7 @@
     const def = enemyDefs[e.type];
     s.kills++;
     s.score += def.score;
-    s.gems.push({ x: e.x, y: e.y, r: 5, value: def.cost >= 5 ? 3 : 1, life: 12 });
+    s.gems.push({ x: e.x, y: e.y, r: 6, value: def.cost >= 5 ? 4 : 2, life: 20 });
     s.floaters.push({ x: e.x, y: e.y, text: `+${def.score}`, life: 0.8, color: "#ffd166" });
     if (def.split) {
       for (let k = 0; k < 2; k++) spawnEnemy("walker", { x: e.x + rand(-18, 18), y: e.y + rand(-18, 18) });
@@ -368,6 +375,7 @@
   }
 
   function damageCryptid(s, amount) {
+    if (s.t < 35) amount *= 0.65;
     if (s.cryptid.shields > 0 && amount >= 4) {
       s.cryptid.shields--;
       s.floaters.push({ x: s.cryptid.x, y: s.cryptid.y - 42, text: "SHIELD", life: 0.9, color: "#83d6ff" });
@@ -437,7 +445,7 @@
       btn.addEventListener("click", () => {
         u.apply(state);
         state.ce -= state.ceNeed;
-        state.ceNeed = Math.floor(state.ceNeed * 1.22 + 4);
+        state.ceNeed = Math.floor(state.ceNeed * 1.18 + 3);
         pausedForUpgrade = false;
         screens.upgrade.classList.remove("active");
         mode = "game";
@@ -572,16 +580,21 @@
   document.getElementById("pauseBtn").addEventListener("click", () => { if (!state || pausedForUpgrade) return; state.paused = !state.paused; last = performance.now(); if (!state.paused) requestAnimationFrame(loop); draw(); });
 
   window.addEventListener("resize", resize);
+  window.addEventListener("orientationchange", () => setTimeout(resize, 250));
+  document.addEventListener("selectstart", e => e.preventDefault());
+  document.addEventListener("dragstart", e => e.preventDefault());
+  document.addEventListener("contextmenu", e => { if (mode === "game") e.preventDefault(); });
+  document.addEventListener("touchmove", e => { if (mode === "game") e.preventDefault(); }, { passive: false });
   window.addEventListener("keydown", e => { if (state) state.keys[e.key] = true; if (e.key === "Escape" && state) state.paused = !state.paused; });
   window.addEventListener("keyup", e => { if (state) state.keys[e.key] = false; });
 
   function setupStick() {
     const stick = ui.stick, knob = ui.knob;
     const reset = () => { if (!state) return; state.stick.active = false; state.stick.x = 0; state.stick.y = 0; knob.style.transform = "translate(0px,0px)"; };
-    stick.addEventListener("pointerdown", e => { stick.setPointerCapture(e.pointerId); if (state) state.stick.active = true; updateStick(e); });
-    stick.addEventListener("pointermove", updateStick);
-    stick.addEventListener("pointerup", reset);
-    stick.addEventListener("pointercancel", reset);
+    stick.addEventListener("pointerdown", e => { e.preventDefault(); stick.setPointerCapture(e.pointerId); if (state) state.stick.active = true; updateStick(e); });
+    stick.addEventListener("pointermove", e => { e.preventDefault(); updateStick(e); });
+    stick.addEventListener("pointerup", e => { e.preventDefault(); reset(); });
+    stick.addEventListener("pointercancel", e => { e.preventDefault(); reset(); });
     function updateStick(e) {
       if (!state || !state.stick.active) return;
       const r = stick.getBoundingClientRect();
