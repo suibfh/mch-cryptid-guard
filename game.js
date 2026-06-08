@@ -44,6 +44,7 @@
     playerNameInput: document.getElementById("playerNameInput"),
     submitScoreBtn: document.getElementById("submitScoreBtn"),
     rankingMessage: document.getElementById("rankingMessage"),
+    heroDetail: document.getElementById("heroDetail"),
   };
 
   const W = 960;
@@ -414,10 +415,10 @@
   // スマホ操作は、ゲーム画面のどこでも使える仮想スティック方式です。
 
   const heroDefs = {
-    balanced: { name: "グリム兄弟", asset: assetPaths.heroes.balanced, icon: "⚔", speed: 210, range: 165, fireRate: 0.68, damage: 14, color: "#83d6ff", magnet: 100 },
-    swift: { name: "ジャックザリッパー", asset: assetPaths.heroes.swift, icon: "✦", speed: 252, range: 145, fireRate: 0.62, damage: 11, color: "#91f0aa", magnet: 130 },
-    guardian: { name: "スパルタクス", asset: assetPaths.heroes.guardian, icon: "◆", speed: 182, range: 150, fireRate: 0.78, damage: 16, color: "#ffd166", magnet: 92, aura: true },
-    sage: { name: "ライト兄弟", asset: assetPaths.heroes.sage, icon: "☄", speed: 192, range: 215, fireRate: 0.88, damage: 23, color: "#c8a2ff", magnet: 98 },
+    balanced: { name: "グリム兄弟", role: "標準・安定型", asset: assetPaths.heroes.balanced, icon: "⚔", speed: 210, range: 165, fireRate: 0.68, damage: 14, color: "#83d6ff", magnet: 100, initialUpgrades: ["shield"], skill: "初期エクステ: シールドLv1。最初の事故を防ぎやすい。" },
+    swift: { name: "ジャックザリッパー", role: "高速・回収型", asset: assetPaths.heroes.swift, icon: "✦", speed: 252, range: 145, fireRate: 0.62, damage: 11, color: "#91f0aa", magnet: 130, initialUpgrades: ["haste"], skill: "初期エクステ: ブーツLv1。移動とCE回収がさらに速い。" },
+    guardian: { name: "スパルタクス", role: "防衛・近距離型", asset: assetPaths.heroes.guardian, icon: "◆", speed: 182, range: 150, fireRate: 0.78, damage: 18, color: "#ffd166", magnet: 92, initialUpgrades: ["orbit"], skill: "初期エクステ: チャクラムLv1。近づいた敵を削りやすい。" },
+    sage: { name: "ライト兄弟", role: "遠距離・高火力型", asset: assetPaths.heroes.sage, icon: "☄", speed: 192, range: 215, fireRate: 0.88, damage: 28, color: "#c8a2ff", magnet: 98, initialUpgrades: ["pierce"], skill: "初期エクステ: ジャベリンLv1。高火力の弾が貫通する。" },
   };
 
   const enemyDefs = {
@@ -441,6 +442,39 @@
     shield: { name: "シールド", asset: assetPaths.upgrades.shield, desc: "大きな被害を一度だけ防ぐ盾を得る。", apply: s => s.cryptid.shields++ },
   };
 
+
+  function applyHeroInitialUpgrades(s, ids) {
+    for (const id of ids) {
+      const u = upgrades[id];
+      if (!u) continue;
+      u.apply(s);
+      s.upgradeCounts[id] = (s.upgradeCounts[id] || 0) + 1;
+    }
+    checkEvolutions(s);
+  }
+
+  function formatStat(value) {
+    return Number.isInteger(value) ? String(value) : String(Math.round(value * 10) / 10);
+  }
+
+  function updateHeroDetail() {
+    if (!ui.heroDetail) return;
+    const h = heroDefs[selectedHero];
+    if (!h) return;
+    const dps = h.damage / h.fireRate;
+    ui.heroDetail.innerHTML = `
+      <div class="hero-detail-head"><b>${h.name}</b><span>${h.role || ""}</span></div>
+      <div class="hero-stats">
+        <span>攻撃 ${h.damage}</span>
+        <span>間隔 ${formatStat(h.fireRate)}秒</span>
+        <span>射程 ${h.range}</span>
+        <span>速度 ${h.speed}</span>
+        <span>CE ${h.magnet}</span>
+        <span>DPS ${formatStat(dps)}</span>
+      </div>
+      <div class="hero-skill">${h.skill || "初期エクステなし"}</div>
+    `;
+  }
 
   const evolutionDefs = {
     holyShot: {
@@ -520,11 +554,12 @@
       evolutions: {},
       evolutionBanner: null,
       stick: { active: false, x: 0, y: 0, baseX: 0, baseY: 0 },
-      player: { x: W / 2, y: H / 2 + 118, r: 14, ...base, baseRange: base.range, fire: 0, orbits: base.aura ? 1 : 0, pierce: 0, ceBurst: 0, shotgun: 0 },
+      player: { x: W / 2, y: H / 2 + 118, r: 14, ...base, baseRange: base.range, fire: 0, orbits: 0, pierce: 0, ceBurst: 0, shotgun: 0 },
       cryptid: { name: "ヨシュカ", oniName: "ヨシュカ チョコラート", x: W / 2, y: H / 2, r: 34, hp: 100, maxHp: 100, wall: 0, slow: 0, shields: 1, hitFlash: 0 },
       paused: false,
       ended: false,
     };
+    applyHeroInitialUpgrades(state, base.initialUpgrades || []);
     pausedForUpgrade = false;
     audioPanelPausedGame = false;
     setAudioPanel(false);
@@ -1537,6 +1572,7 @@
       document.querySelectorAll(".hero-card").forEach(b => b.classList.remove("selected"));
       btn.classList.add("selected");
       selectedHero = btn.dataset.hero;
+      updateHeroDetail();
     });
   });
   document.getElementById("startBtn").addEventListener("click", e => { unlockAudio(); newGame(); });
@@ -1679,6 +1715,7 @@
 
   syncAudioControls();
   setupStick();
+  updateHeroDetail();
   updateBestText();
   resize();
 })();
