@@ -4,34 +4,38 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <title>MCH Cryptid Guard - Test v4</title>
+  <title>MCH Yoshka Guard - Test v5</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <main id="app">
     <section id="startScreen" class="panel screen active">
-      <div class="brand">MCH Cryptid Guard</div>
-      <h1>クリプタイド防衛テスト版</h1>
-      <p class="lead">中央のクリプタイドを3分間守る、軽量な防衛サバイバルです。攻撃は自動。移動と強化選択だけで遊べます。</p>
+      <div class="brand">MCH Yoshka Guard</div>
+      <h1>ヨシュカ防衛テスト版</h1>
+      <p class="lead">ヨシュカを3分間守り、その後の<span class="red-text">鬼TIME</span>でスコアを稼ぐ軽量な防衛サバイバルです。攻撃は自動。移動と加護選択だけで遊べます。</p>
       <div class="grid two">
         <button class="hero-card selected" data-hero="balanced">
+          <img class="hero-img" src="Image/Heroes/2005.png" alt="グリム兄弟" onerror="this.style.display='none'" draggable="false" />
           <span class="hero-icon">⚔</span>
-          <b>Balanced</b>
+          <b>グリム兄弟</b>
           <small>扱いやすい標準型</small>
         </button>
         <button class="hero-card" data-hero="swift">
+          <img class="hero-img" src="Image/Heroes/2003.png" alt="ジャックザリッパー" onerror="this.style.display='none'" draggable="false" />
           <span class="hero-icon">✦</span>
-          <b>Swift</b>
+          <b>ジャックザリッパー</b>
           <small>移動が速い回収型</small>
         </button>
         <button class="hero-card" data-hero="guardian">
+          <img class="hero-img" src="Image/Heroes/2002.png" alt="スパルタクス" onerror="this.style.display='none'" draggable="false" />
           <span class="hero-icon">◆</span>
-          <b>Guardian</b>
+          <b>スパルタクス</b>
           <small>防衛に強い近距離型</small>
         </button>
         <button class="hero-card" data-hero="sage">
+          <img class="hero-img" src="Image/Heroes/2001.png" alt="ライト兄弟" onerror="this.style.display='none'" draggable="false" />
           <span class="hero-icon">☄</span>
-          <b>Sage</b>
+          <b>ライト兄弟</b>
           <small>遠距離に強い火力型</small>
         </button>
       </div>
@@ -46,9 +50,9 @@
     <section id="howScreen" class="panel screen">
       <h2>遊び方</h2>
       <p>PCはWASDまたは矢印キーで移動。スマホは画面右下のスティックで移動します。タイトル画面で左右を切り替えできます。</p>
-      <p>攻撃は自動です。敵を倒すとCEが出ます。CEを集めると加護を選べます。散弾、貫通、索敵拡張、護衛リングなどを重ねてビルドを作ります。</p>
-      <p>特定の加護をそろえると上位加護に進化します。散弾Lv3+索敵拡張Lv1で「拡散聖弾」、貫通弾Lv3+散弾Lv2で「貫通散弾」、護衛リングLv3+俊足Lv1で「旋風リング」、結界Lv3+遅滞領域Lv1で「聖域結界」です。</p>
-      <p>敵は時間で単純に強くなるのではなく、役割が増えます。危険な敵には予告が出ます。</p>
+      <p>攻撃は自動です。敵を倒すとCEが出ます。CEを集めるとエクステンション加護を選べます。散弾、貫通、索敵拡張、護衛リングなどを重ねてビルドを作ります。</p>
+      <p>特定の加護をそろえると上位加護に進化します。フレイルLv3+ギョクLv1で「グランダルメ」、ジャベリンLv3+フレイルLv2で「バリスタ」、チャクラムLv3+ブーツLv1で「宇宙観測スフィア」、シールドシステムLv3+籠罠Lv1で「アメノミナカヌシ」です。</p>
+      <p>3分守り切ると<span class="red-text">鬼TIME</span>に入ります。鬼TIMEではヨシュカが「ヨシュカ チョコラート」に変化し、敵が強くなりますがスコア倍率も上がります。最終的に倒されるまで、どれだけ稼げるかを競います。</p>
       <div class="actions"><button id="backBtn" class="secondary">戻る</button></div>
     </section>
 
@@ -56,7 +60,7 @@
       <canvas id="game" width="960" height="540" aria-label="game canvas" draggable="false"></canvas>
       <div id="hud">
         <div><b>TIME</b><span id="timeText">03:00</span></div>
-        <div><b>CRYPTID</b><span id="hpText">100%</span></div>
+        <div><b>YOSHKA</b><span id="hpText">100%</span></div>
         <div><b>CE</b><span id="ceText">0/6</span></div>
         <div><b>SCORE</b><span id="scoreText">0</span></div>
       </div>
@@ -65,12 +69,13 @@
     </section>
 
     <section id="upgradeScreen" class="panel overlay">
-      <h2>クリプタイドの加護</h2>
+      <h2>エクステンション加護</h2>
       <p id="upgradeHint">今の状況に応じた候補が出ます。</p>
       <div id="upgradeOptions" class="grid three"></div>
     </section>
 
-    <section id="resultScreen" class="panel screen">
+    <section id="resultScreen" class="panel screen result-panel">
+      <div id="goldFx" class="gold-fx" aria-hidden="true"></div>
       <h2 id="resultTitle">結果</h2>
       <p id="resultSummary"></p>
       <div id="resultStats" class="result-stats"></div>

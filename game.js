@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const STORAGE_KEY = "mch_cryptid_guard_test_v4";
+  const STORAGE_KEY = "mch_yoshka_guard_test_v5";
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
 
@@ -45,6 +45,75 @@
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const angleTo = (a, b) => Math.atan2(b.y - a.y, b.x - a.x);
 
+  const assetPaths = {
+    background: "Image/Backgrounds/1001.png",
+    yoshka: "Image/Enemies/171.png",
+    yoshkaOni: "Image/Enemies/172.png",
+    heroes: {
+      balanced: "Image/Heroes/2005.png",
+      swift: "Image/Heroes/2003.png",
+      guardian: "Image/Heroes/2002.png",
+      sage: "Image/Heroes/2001.png",
+    },
+    enemies: {
+      walker: "Image/Enemies/101.png",
+      runner: "Image/Enemies/102.png",
+      archer: "Image/Enemies/103.png",
+      splitter: "Image/Enemies/104.png",
+      hexer: "Image/Enemies/105.png",
+    },
+    oniEnemies: {
+      walker: "Image/Enemies/141.png",
+      runner: "Image/Enemies/143.png",
+      archer: "Image/Enemies/145.png",
+      splitter: "Image/Enemies/147.png",
+      hexer: "Image/Enemies/156.png",
+    },
+    upgrades: {
+      orbit: "Image/Extensions/2192.png",
+      wall: "Image/Extensions/2147.png",
+      pierce: "Image/Extensions/2187.png",
+      shotgun: "Image/Extensions/2183.png",
+      burst: "Image/Extensions/2121.png",
+      range: "Image/Extensions/2098.png",
+      haste: "Image/Extensions/2031.png",
+      slow: "Image/Extensions/2179.png",
+      heal: "Image/Extensions/2129.png",
+      shield: "Image/Extensions/2010.png",
+    },
+    evolutions: {
+      holyShot: "Image/Extensions/5002.png",
+      pierceShotgun: "Image/Extensions/5035.png",
+      whirlOrbit: "Image/Extensions/5143.png",
+      sanctuary: "Image/Extensions/5147.png",
+    }
+  };
+  const imageCache = new Map();
+  function loadImage(path) {
+    if (!path) return null;
+    if (imageCache.has(path)) return imageCache.get(path);
+    const img = new Image();
+    img.draggable = false;
+    img._ready = false;
+    img.onload = () => { img._ready = true; };
+    img.onerror = () => { img._error = true; };
+    img.src = path;
+    imageCache.set(path, img);
+    return img;
+  }
+  function drawAsset(path, x, y, w, h) {
+    const img = loadImage(path);
+    if (img && img._ready) { ctx.drawImage(img, x - w / 2, y - h / 2, w, h); return true; }
+    return false;
+  }
+  Object.values(assetPaths.heroes).forEach(loadImage);
+  Object.values(assetPaths.enemies).forEach(loadImage);
+  Object.values(assetPaths.oniEnemies).forEach(loadImage);
+  Object.values(assetPaths.upgrades).forEach(loadImage);
+  Object.values(assetPaths.evolutions).forEach(loadImage);
+  [assetPaths.background, assetPaths.yoshka, assetPaths.yoshkaOni].forEach(loadImage);
+
+
   function loadSave() {
     try { return { best: 0, plays: 0, stickSide: "right", ...(JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}) }; }
     catch { return { best: 0, plays: 0, stickSide: "right" }; }
@@ -71,54 +140,58 @@
   }
 
   const heroDefs = {
-    balanced: { icon: "⚔", speed: 210, range: 165, fireRate: 0.68, damage: 14, color: "#83d6ff", magnet: 100 },
-    swift: { icon: "✦", speed: 252, range: 145, fireRate: 0.62, damage: 11, color: "#91f0aa", magnet: 130 },
-    guardian: { icon: "◆", speed: 182, range: 150, fireRate: 0.78, damage: 13, color: "#ffd166", magnet: 92, aura: true },
-    sage: { icon: "☄", speed: 192, range: 215, fireRate: 0.88, damage: 18, color: "#c8a2ff", magnet: 98 },
+    balanced: { name: "グリム兄弟", asset: assetPaths.heroes.balanced, icon: "⚔", speed: 210, range: 165, fireRate: 0.68, damage: 14, color: "#83d6ff", magnet: 100 },
+    swift: { name: "ジャックザリッパー", asset: assetPaths.heroes.swift, icon: "✦", speed: 252, range: 145, fireRate: 0.62, damage: 11, color: "#91f0aa", magnet: 130 },
+    guardian: { name: "スパルタクス", asset: assetPaths.heroes.guardian, icon: "◆", speed: 182, range: 150, fireRate: 0.78, damage: 13, color: "#ffd166", magnet: 92, aura: true },
+    sage: { name: "ライト兄弟", asset: assetPaths.heroes.sage, icon: "☄", speed: 192, range: 215, fireRate: 0.88, damage: 18, color: "#c8a2ff", magnet: 98 },
   };
 
   const enemyDefs = {
-    walker: { cost: 1, hp: 20, speed: 36, damage: 3, radius: 12, color: "#ff7979", score: 12 },
-    runner: { cost: 3, hp: 16, speed: 70, damage: 3, radius: 10, color: "#ffb86b", score: 18 },
-    archer: { cost: 5, hp: 24, speed: 24, damage: 3, radius: 12, color: "#f78bd8", score: 28, ranged: true, range: 250, cooldown: 2.6 },
-    splitter: { cost: 6, hp: 38, speed: 30, damage: 4, radius: 15, color: "#a3e635", score: 35, split: true },
-    hexer: { cost: 7, hp: 30, speed: 31, damage: 2, radius: 13, color: "#b58cff", score: 42, debuff: true },
+    walker: { name: "クリーパー ショート", oniName: "クリーパー トール ドッピオ", cost: 1, hp: 20, speed: 36, damage: 3, radius: 12, color: "#ff7979", score: 12 },
+    runner: { name: "クリーパー トール", oniName: "クリーパー グランデ ドッピオ", cost: 3, hp: 16, speed: 70, damage: 3, radius: 10, color: "#ffb86b", score: 18 },
+    archer: { name: "クリーパー グランデ", oniName: "クリーパー ヴェンティ ドッピオ", cost: 5, hp: 24, speed: 24, damage: 3, radius: 12, color: "#f78bd8", score: 28, ranged: true, range: 250, cooldown: 2.6 },
+    splitter: { name: "クリーパー ヴェンティ", oniName: "クリーパー フラペチーノ ドッピオ", cost: 6, hp: 38, speed: 30, damage: 4, radius: 15, color: "#a3e635", score: 35, split: true },
+    hexer: { name: "クリーパー マキアート", oniName: "ハートブリード フラペチーノ ドッピオ", cost: 7, hp: 30, speed: 31, damage: 2, radius: 13, color: "#b58cff", score: 42, debuff: true },
   };
 
   const upgrades = {
-    orbit: { name: "護衛リング", desc: "周囲を回る弾を1つ追加。近づく敵に強い。", apply: s => s.player.orbits++ },
-    range: { name: "索敵拡張", desc: "自動攻撃の射程が広がる。遠距離敵を処理しやすい。", apply: s => s.player.range += 42 },
-    haste: { name: "俊足", desc: "移動速度とCE回収範囲が上がる。", apply: s => { s.player.speed += 28; s.player.magnet += 24; } },
-    wall: { name: "結界", desc: "クリプタイドの周囲に防衛弾を追加。", apply: s => s.cryptid.wall++ },
-    heal: { name: "再生", desc: "クリプタイドのHPを少し回復する。", apply: s => s.cryptid.hp = clamp(s.cryptid.hp + 22, 0, s.cryptid.maxHp) },
-    slow: { name: "遅滞領域", desc: "クリプタイド周辺の敵を遅くする。", apply: s => s.cryptid.slow += 0.08 },
-    pierce: { name: "貫通弾", desc: "通常攻撃が1体貫通。弾の威力は少し下がるが密集に強い。", apply: s => s.player.pierce++ },
-    shotgun: { name: "散弾", desc: "近距離へ扇形に追加弾を放つ。大量の敵を押し返しやすい。", apply: s => s.player.shotgun++ },
-    burst: { name: "CE爆発", desc: "CE取得時、近くの敵に小ダメージ。", apply: s => s.player.ceBurst += 7 },
-    shield: { name: "緊急盾", desc: "大きな被害を一度だけ防ぐ盾を得る。", apply: s => s.cryptid.shields++ },
+    orbit: { name: "チャクラム", asset: assetPaths.upgrades.orbit, desc: "周囲を回る弾を1つ追加。近づく敵に強い。", apply: s => s.player.orbits++ },
+    range: { name: "ギョク", asset: assetPaths.upgrades.range, desc: "自動攻撃の射程が広がる。遠距離敵を処理しやすい。", apply: s => s.player.range += 42 },
+    haste: { name: "ブーツ", asset: assetPaths.upgrades.haste, desc: "移動速度とCE回収範囲が上がる。", apply: s => { s.player.speed += 28; s.player.magnet += 24; } },
+    wall: { name: "シールドシステム", asset: assetPaths.upgrades.wall, desc: "ヨシュカの周囲に防衛弾を追加。", apply: s => s.cryptid.wall++ },
+    heal: { name: "パンケーキ", asset: assetPaths.upgrades.heal, desc: "ヨシュカのHPを少し回復する。", apply: s => s.cryptid.hp = clamp(s.cryptid.hp + 22, 0, s.cryptid.maxHp) },
+    slow: { name: "籠罠", asset: assetPaths.upgrades.slow, desc: "ヨシュカ周辺の敵を遅くする。", apply: s => s.cryptid.slow += 0.08 },
+    pierce: { name: "ジャベリン", asset: assetPaths.upgrades.pierce, desc: "通常攻撃が1体貫通。弾の威力は少し下がるが密集に強い。", apply: s => s.player.pierce++ },
+    shotgun: { name: "フレイル", asset: assetPaths.upgrades.shotgun, desc: "近距離へ扇形に追加弾を放つ。大量の敵を押し返しやすい。", apply: s => s.player.shotgun++ },
+    burst: { name: "実はミサイル", asset: assetPaths.upgrades.burst, desc: "CE取得時、近くの敵に小ダメージ。", apply: s => s.player.ceBurst += 7 },
+    shield: { name: "シールド", asset: assetPaths.upgrades.shield, desc: "大きな被害を一度だけ防ぐ盾を得る。", apply: s => s.cryptid.shields++ },
   };
 
 
   const evolutionDefs = {
     holyShot: {
-      name: "拡散聖弾",
+      name: "グランダルメ",
+      asset: assetPaths.evolutions.holyShot,
       condition: s => (s.upgradeCounts.shotgun || 0) >= 3 && (s.upgradeCounts.range || 0) >= 1,
-      desc: "散弾Lv3 + 索敵拡張Lv1。散弾の弾数、射程、広がりが上がる。"
+      desc: "フレイルLv3 + ギョクLv1。フレイルの弾数、射程、広がりが上がる。"
     },
     pierceShotgun: {
-      name: "貫通散弾",
+      name: "バリスタ",
+      asset: assetPaths.evolutions.pierceShotgun,
       condition: s => (s.upgradeCounts.pierce || 0) >= 3 && (s.upgradeCounts.shotgun || 0) >= 2,
-      desc: "貫通弾Lv3 + 散弾Lv2。散弾の一部が敵を貫通する。"
+      desc: "ジャベリンLv3 + フレイルLv2。フレイルの一部が敵を貫通する。"
     },
     whirlOrbit: {
-      name: "旋風リング",
+      name: "宇宙観測スフィア",
+      asset: assetPaths.evolutions.whirlOrbit,
       condition: s => (s.upgradeCounts.orbit || 0) >= 3 && (s.upgradeCounts.haste || 0) >= 1,
-      desc: "護衛リングLv3 + 俊足Lv1。リングが増え、当たった敵を少し押し返す。"
+      desc: "チャクラムLv3 + ブーツLv1。リングが増え、当たった敵を少し押し返す。"
     },
     sanctuary: {
-      name: "聖域結界",
+      name: "アメノミナカヌシ",
+      asset: assetPaths.evolutions.sanctuary,
       condition: s => (s.upgradeCounts.wall || 0) >= 3 && (s.upgradeCounts.slow || 0) >= 1,
-      desc: "結界Lv3 + 遅滞領域Lv1。クリプタイド周辺に防衛領域を作る。"
+      desc: "シールドシステムLv3 + 籠罠Lv1。ヨシュカ周辺に防衛領域を作る。"
     },
   };
 
@@ -151,6 +224,9 @@
     state = {
       t: 0,
       duration: 180,
+      oni: false,
+      oniTime: 0,
+      scoreMultiplier: 1,
       score: 0,
       kills: 0,
       ce: 0,
@@ -164,13 +240,13 @@
       gems: [],
       floaters: [],
       keys: {},
-      stats: { enemyScore: 0, ceScore: 0, clearBonus: 0, hpBonus: 0, killBonus: 0, ceCollected: 0, upgrades: 0 },
+      stats: { enemyScore: 0, ceScore: 0, clearBonus: 0, hpBonus: 0, killBonus: 0, oniBonus: 0, ceCollected: 0, upgrades: 0 },
       upgradeCounts: {},
       evolutions: {},
       evolutionBanner: null,
       stick: { active: false, x: 0, y: 0 },
       player: { x: W / 2, y: H / 2 + 118, r: 14, ...base, fire: 0, orbits: base.aura ? 1 : 0, pierce: 0, ceBurst: 0, shotgun: 0 },
-      cryptid: { x: W / 2, y: H / 2, r: 32, hp: 100, maxHp: 100, wall: 0, slow: 0, shields: 1, hitFlash: 0 },
+      cryptid: { name: "ヨシュカ", oniName: "ヨシュカ チョコラート", x: W / 2, y: H / 2, r: 34, hp: 100, maxHp: 100, wall: 0, slow: 0, shields: 1, hitFlash: 0 },
       paused: false,
       ended: false,
     };
@@ -179,6 +255,16 @@
     resize();
     last = performance.now();
     requestAnimationFrame(loop);
+  }
+
+
+  function enterOniTime(s) {
+    s.oni = true;
+    s.oniTime = 0;
+    s.scoreMultiplier = 2;
+    s.cryptid.hp = Math.min(s.cryptid.maxHp, s.cryptid.hp + 18);
+    s.evolutionBanner = { text: "鬼TIME", life: 3.0, oni: true };
+    s.warnings.push({ x: W / 2, y: 78, text: "鬼TIME", life: 2.2, color: "#ff4b4b" });
   }
 
   function currentPhase(t) {
@@ -201,19 +287,22 @@
   function spawnBudget(s) {
     const phase = currentPhase(s.t);
     let budget = 0.74 + phase * 0.62;
+    if (s.oni) budget = 3.2 + Math.min(4.0, s.oniTime * 0.09);
     if (phase >= 4) budget += 0.35;
     if (phase >= 5) budget += 0.55;
     if (s.t < 25) budget *= 0.72;
-    if (s.cryptid.hp < 55) budget *= 0.78;
-    if (s.cryptid.hp < 35) budget *= 0.58;
-    if (s.enemies.length > 28) budget *= 0.35;
-    if (s.enemies.length > 42) budget = 0;
+    if (!s.oni && s.cryptid.hp < 55) budget *= 0.78;
+    if (!s.oni && s.cryptid.hp < 35) budget *= 0.58;
+    if (!s.oni && s.enemies.length > 28) budget *= 0.35;
+    if (!s.oni && s.enemies.length > 42) budget = 0;
+    if (s.oni && s.enemies.length > 58) budget *= 0.35;
+    if (s.oni && s.enemies.length > 86) budget = 0;
     return budget;
   }
 
   function pickEnemy(s) {
     const phase = currentPhase(s.t);
-    const allowed = allowedEnemies(phase);
+    const allowed = s.oni ? ["walker", "runner", "archer", "splitter", "hexer"] : allowedEnemies(phase);
     const recent = s.threatMemory.slice(-4);
     const heavyRecent = recent.filter(k => enemyDefs[k].cost >= 5).length;
     let pool = allowed.filter(k => !(enemyDefs[k].cost >= 5 && heavyRecent >= 2));
@@ -245,8 +334,8 @@
     else if (side === 2) { x = rand(-40, W + 40); y = H + 30; }
     else { x = -30; y = rand(-40, H + 40); }
     const e = {
-      type, x, y, r: def.radius, hp: def.hp, maxHp: def.hp,
-      speed: def.speed, damage: def.damage, color: def.color, cd: rand(0.4, 1.2), warned: false,
+      type, x, y, r: def.radius, hp: def.hp * (state.oni ? 1.55 : 1), maxHp: def.hp * (state.oni ? 1.55 : 1),
+      speed: def.speed * (state.oni ? 1.18 : 1), damage: def.damage * (state.oni ? 1.35 : 1), color: def.color, cd: rand(0.4, 1.2), warned: false, oni: state.oni,
     };
     if (def.ranged || def.debuff) {
       state.warnings.push({ x, y, text: def.ranged ? "遠距離敵" : "妨害敵", life: 1.25, color: def.ranged ? "#f78bd8" : "#b58cff" });
@@ -260,8 +349,9 @@
     const s = state;
     if (!s || s.ended || pausedForUpgrade || s.paused) return;
     s.t += dt;
+    if (s.oni) s.oniTime += dt;
     s.phase = currentPhase(s.t);
-    if (s.t >= s.duration) return endGame(true);
+    if (s.t >= s.duration && !s.oni) enterOniTime(s);
 
     movePlayer(s, dt);
     spawnSystem(s, dt);
@@ -491,10 +581,12 @@
     if (!reward) return;
     const def = enemyDefs[e.type];
     s.kills++;
-    s.score += def.score;
-    s.stats.enemyScore += def.score;
-    s.gems.push({ x: e.x, y: e.y, r: 6, value: def.cost >= 5 ? 4 : 2, life: 20 });
-    s.floaters.push({ x: e.x, y: e.y, text: `+${def.score}`, life: 0.8, color: "#ffd166" });
+    const gainedScore = Math.floor(def.score * (s.scoreMultiplier || 1));
+    s.score += gainedScore;
+    s.stats.enemyScore += gainedScore;
+    if (s.oni) s.stats.oniBonus += gainedScore - def.score;
+    s.gems.push({ x: e.x, y: e.y, r: 6, value: (def.cost >= 5 ? 4 : 2) + (s.oni ? 1 : 0), life: 20 });
+    s.floaters.push({ x: e.x, y: e.y, text: `+${gainedScore}`, life: 0.8, color: "#ffd166" });
     if (def.split) {
       for (let k = 0; k < 2; k++) spawnEnemy("walker", { x: e.x + rand(-18, 18), y: e.y + rand(-18, 18) });
     }
@@ -590,12 +682,12 @@
     pausedForUpgrade = true;
     const candidates = chooseUpgradeCandidates(state);
     ui.upgradeOptions.innerHTML = "";
-    ui.upgradeHint.textContent = state.cryptid.hp < 45 ? "クリプタイドが危険です。守りを厚くする候補を含めています。" : "現在の敵構成を見て候補を出しています。";
+    ui.upgradeHint.textContent = state.cryptid.hp < 45 ? "ヨシュカが危険です。守りを厚くする候補を含めています。" : "現在の敵構成を見て候補を出しています。";
     for (const id of candidates) {
       const u = upgrades[id];
       const btn = document.createElement("button");
       btn.className = "upgrade-card";
-      btn.innerHTML = `<b>${u.name}</b><small>${u.desc}</small>`;
+      btn.innerHTML = `${u.asset ? `<img src="${u.asset}" alt="${u.name}" onerror="this.style.display='none'" draggable="false">` : ""}<b>${u.name}</b><small>${u.desc}</small>`;
       btn.addEventListener("click", () => {
         u.apply(state);
         state.upgradeCounts[id] = (state.upgradeCounts[id] || 0) + 1;
@@ -616,8 +708,15 @@
   }
 
   function updateUI(s) {
-    const remain = Math.max(0, Math.ceil(s.duration - s.t));
-    ui.time.textContent = `${String(Math.floor(remain / 60)).padStart(2, "0")}:${String(remain % 60).padStart(2, "0")}`;
+    if (s.oni) {
+      const ot = Math.floor(s.oniTime);
+      ui.time.textContent = `鬼 ${String(Math.floor(ot / 60)).padStart(2, "0")}:${String(ot % 60).padStart(2, "0")}`;
+      ui.time.classList.add("oni-hud");
+    } else {
+      const remain = Math.max(0, Math.ceil(s.duration - s.t));
+      ui.time.textContent = `${String(Math.floor(remain / 60)).padStart(2, "0")}:${String(remain % 60).padStart(2, "0")}`;
+      ui.time.classList.remove("oni-hud");
+    }
     ui.hp.textContent = `${Math.ceil(s.cryptid.hp)}%`;
     ui.ce.textContent = `${Math.floor(s.ce)}/${s.ceNeed}`;
     ui.score.textContent = `${Math.floor(s.score)}`;
@@ -626,7 +725,7 @@
   function endGame(win) {
     if (!state || state.ended) return;
     state.ended = true;
-    state.stats.clearBonus = win ? 900 : 0;
+    state.stats.clearBonus = state.t >= state.duration ? 900 : 0;
     state.stats.hpBonus = Math.floor(Math.max(0, state.cryptid.hp) * 12);
     state.stats.killBonus = state.kills * 3;
     const finalScore = Math.floor(state.score + state.stats.clearBonus + state.stats.hpBonus + state.stats.killBonus);
@@ -634,8 +733,8 @@
     saved.plays = (saved.plays || 0) + 1;
     saved.best = Math.max(saved.best || 0, finalScore);
     save(saved);
-    ui.resultTitle.textContent = win ? "防衛成功" : "防衛失敗";
-    ui.resultSummary.textContent = win ? "クリプタイドを守り切りました。" : "クリプタイドが倒されました。次は危険な敵を早めに処理してください。";
+    ui.resultTitle.textContent = state.t >= state.duration ? "スコア確定" : "防衛失敗";
+    ui.resultSummary.textContent = state.t >= state.duration ? "ヨシュカを3分守り切り、鬼TIMEで稼いだ最終結果です。" : "ヨシュカが倒されました。次は危険な敵を早めに処理してください。";
     const build = buildText(state);
     ui.resultStats.innerHTML = `
       <div><b>スコア</b>${finalScore}</div>
@@ -645,6 +744,8 @@
       <div><b>撃破点</b>${state.stats.enemyScore}</div>
       <div><b>CE点</b>${state.stats.ceScore}</div>
       <div><b>防衛点</b>${state.stats.clearBonus + state.stats.hpBonus}</div>
+      <div><b>鬼TIME加点</b>${state.stats.oniBonus}</div>
+      <div><b>到達時間</b>${Math.floor(state.t)}秒</div>
       <div><b>ビルド</b>${build}</div>
       <div class="wide"><b>共有用</b>Score ${finalScore} / ${build}</div>
     `;
@@ -656,10 +757,12 @@
     if (!state) return;
     const s = state;
     ctx.clearRect(0, 0, W, H);
-    const g = ctx.createRadialGradient(W/2, H/2, 20, W/2, H/2, 520);
-    g.addColorStop(0, "#1b2a43");
-    g.addColorStop(1, "#090b12");
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    if (!drawBackgroundImage(s)) {
+      const g = ctx.createRadialGradient(W/2, H/2, 20, W/2, H/2, 520);
+      g.addColorStop(0, s.oni ? "#3a1016" : "#1b2a43");
+      g.addColorStop(1, "#090b12");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    }
     drawGrid(s);
     drawCryptid(s);
     for (const gem of s.gems) drawGem(gem);
@@ -669,7 +772,21 @@
     for (const w of s.warnings) drawWarning(w);
     for (const f of s.floaters) drawFloater(f);
     if (s.evolutionBanner) drawEvolutionBanner(s.evolutionBanner);
+    if (s.oni) drawOniText(s);
     if (s.paused) drawCenterText("PAUSE");
+  }
+
+
+  function drawBackgroundImage(s) {
+    const img = loadImage(assetPaths.background);
+    if (!img || !img._ready) return false;
+    const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+    const w = img.naturalWidth * scale;
+    const h = img.naturalHeight * scale;
+    ctx.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+    ctx.fillStyle = s.oni ? "rgba(75, 0, 0, 0.45)" : "rgba(3, 8, 18, 0.48)";
+    ctx.fillRect(0, 0, W, H);
+    return true;
   }
 
   function drawGrid(s) {
@@ -686,12 +803,16 @@
   function drawCryptid(s) {
     const c = s.cryptid;
     ctx.save();
-    ctx.shadowColor = c.hitFlash > 0 ? "#ff7979" : "#83d6ff";
+    ctx.shadowColor = c.hitFlash > 0 ? "#ff7979" : (s.oni ? "#ff4b4b" : "#83d6ff");
     ctx.shadowBlur = 24;
-    circle(c.x, c.y, c.r, c.hitFlash > 0 ? "#ff7979" : "#235b78");
+    const ok = drawAsset(s.oni ? assetPaths.yoshkaOni : assetPaths.yoshka, c.x, c.y, 78, 78);
+    if (!ok) {
+      circle(c.x, c.y, c.r, c.hitFlash > 0 ? "#ff7979" : (s.oni ? "#5a1820" : "#235b78"));
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = s.oni ? "#ff4b4b" : "#83d6ff"; ctx.lineWidth = 3; ctx.stroke();
+      ctx.fillStyle = "#fff"; ctx.font = "24px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(s.oni ? "鬼" : "◇", c.x, c.y + 1);
+    }
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = "#83d6ff"; ctx.lineWidth = 3; ctx.stroke();
-    ctx.fillStyle = "#fff"; ctx.font = "24px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("◇", c.x, c.y + 1);
     if (c.slow > 0) { ctx.globalAlpha = 0.12; circle(c.x, c.y, 120, "#83d6ff"); }
     const wallCount = effectiveWallCount(s);
     for (let i = 0; i < wallCount; i++) { const a = -s.t * (1.35 + i * 0.06) + (Math.PI * 2 * i) / Math.max(1, wallCount); circle(c.x + Math.cos(a)*56, c.y + Math.sin(a)*56, 8, s.evolutions.sanctuary ? "#b8f7ff" : "#83d6ff"); }
@@ -702,8 +823,10 @@
     const p = s.player;
     ctx.save();
     circle(p.x, p.y, p.r + 5, "rgba(255,255,255,0.08)");
-    circle(p.x, p.y, p.r, p.color);
-    ctx.fillStyle = "#06101a"; ctx.font = "20px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(p.icon, p.x, p.y + 1);
+    if (!drawAsset(p.asset, p.x, p.y, 46, 46)) {
+      circle(p.x, p.y, p.r, p.color);
+      ctx.fillStyle = "#06101a"; ctx.font = "20px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(p.icon, p.x, p.y + 1);
+    }
     ctx.globalAlpha = 0.12; circle(p.x, p.y, p.range, p.color); ctx.globalAlpha = 1;
     const orbitCount = effectiveOrbitCount(s);
     for (let i = 0; i < orbitCount; i++) { const a = s.t*((s.evolutions.whirlOrbit ? 2.75 : 1.85)+i*0.12)+(Math.PI*2*i)/Math.max(1,orbitCount); circle(p.x+Math.cos(a)*42, p.y+Math.sin(a)*42, 7, s.evolutions.whirlOrbit ? "#ffe8a3" : "#ffd166"); }
@@ -711,8 +834,11 @@
   }
   function drawEnemy(e) {
     ctx.save();
-    circle(e.x, e.y, e.r, e.color);
-    ctx.strokeStyle = "rgba(255,255,255,0.75)"; ctx.lineWidth = 1.5; ctx.stroke();
+    const path = e.oni ? assetPaths.oniEnemies[e.type] : assetPaths.enemies[e.type];
+    if (!drawAsset(path, e.x, e.y, e.r * 3.0, e.r * 3.0)) {
+      circle(e.x, e.y, e.r, e.color);
+      ctx.strokeStyle = "rgba(255,255,255,0.75)"; ctx.lineWidth = 1.5; ctx.stroke();
+    }
     const w = e.r * 2.2;
     ctx.fillStyle = "rgba(0,0,0,0.45)"; ctx.fillRect(e.x - w/2, e.y - e.r - 10, w, 4);
     ctx.fillStyle = "#91f0aa"; ctx.fillRect(e.x - w/2, e.y - e.r - 10, w * clamp(e.hp / e.maxHp, 0, 1), 4);
@@ -729,13 +855,25 @@
     const alpha = clamp(b.life, 0, 1);
     ctx.globalAlpha = alpha;
     ctx.fillStyle = "rgba(0,0,0,0.52)";
-    ctx.strokeStyle = "#ffd166";
+    ctx.strokeStyle = b.oni ? "#ff4b4b" : "#ffd166";
     ctx.lineWidth = 2;
     const x = W / 2 - 220, y = 58, w = 440, h = 48;
     ctx.beginPath(); ctx.roundRect(x, y, w, h, 14); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#ffd166"; ctx.font = "bold 22px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(b.text, W / 2, y + h / 2);
+    ctx.fillStyle = b.oni ? "#ff4b4b" : "#ffd166"; ctx.font = "bold 22px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(b.text, W / 2, y + h / 2);
     ctx.restore();
   }
+
+  function drawOniText(s) {
+    ctx.save();
+    ctx.globalAlpha = 0.22 + 0.08 * Math.sin(s.t * 6);
+    ctx.fillStyle = "#ff4b4b";
+    ctx.font = "900 58px system-ui";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("鬼TIME", W / 2, 72);
+    ctx.restore();
+  }
+
   function drawCenterText(text) { ctx.fillStyle = "rgba(0,0,0,0.45)"; ctx.fillRect(0,0,W,H); ctx.fillStyle = "#fff"; ctx.font = "bold 42px system-ui"; ctx.textAlign = "center"; ctx.fillText(text, W/2, H/2); }
 
   function loop(now) {

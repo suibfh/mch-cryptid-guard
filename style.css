@@ -26,7 +26,9 @@ p { color: var(--muted); line-height: 1.7; }
 .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .hero-card, .upgrade-card { border: 1px solid var(--line); background: rgba(255,255,255,0.04); border-radius: 16px; padding: 16px; text-align: left; cursor: pointer; min-height: 112px; }
 .hero-card.selected, .hero-card:hover, .upgrade-card:hover { border-color: var(--accent); background: rgba(131,214,255,0.12); }
+.hero-img { width: 58px; height: 58px; object-fit: contain; display: block; margin-bottom: 8px; image-rendering: auto; }
 .hero-icon { display: block; font-size: 30px; margin-bottom: 8px; }
+.hero-img:not([style*="display: none"]) + .hero-icon { display: none; }
 .hero-card small, .upgrade-card small { display: block; color: var(--muted); margin-top: 6px; line-height: 1.45; }
 .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
 .primary, .secondary { border: 0; border-radius: 999px; padding: 12px 22px; cursor: pointer; font-weight: 800; }
@@ -65,3 +67,19 @@ body.stick-right #pauseBtn { left: calc(var(--game-left, 0px) + 22px); }
   body.stick-right #pauseBtn { left: calc(var(--game-left, 0px) + 14px); }
 }
 .result-stats .wide { grid-column: 1 / -1; word-break: break-word; }
+
+.red-text { color: #ff4b4b; font-weight: 900; }
+.upgrade-card img { width: 42px; height: 42px; object-fit: contain; display: block; margin-bottom: 8px; }
+.oni-hud { color: #ff4b4b !important; text-shadow: 0 0 10px rgba(255,75,75,0.8); }
+.result-panel { position: relative; overflow: hidden; }
+.gold-fx { position: absolute; inset: 0; pointer-events: none; opacity: 0.9; background:
+  radial-gradient(circle at 18% 22%, rgba(255, 231, 102, 0.28), transparent 4%),
+  radial-gradient(circle at 78% 18%, rgba(255, 209, 102, 0.24), transparent 4%),
+  radial-gradient(circle at 48% 8%, rgba(255, 255, 255, 0.20), transparent 3%),
+  radial-gradient(circle at 28% 78%, rgba(255, 231, 102, 0.18), transparent 4%),
+  radial-gradient(circle at 86% 66%, rgba(255, 209, 102, 0.18), transparent 5%);
+  animation: goldPulse 1.4s ease-in-out infinite alternate;
+}
+.result-panel::before { content: ""; position: absolute; top: 14px; right: 18px; width: 68px; height: 52px; border-radius: 10px 10px 14px 14px; background: linear-gradient(to left top, #ffe766, #998100); box-shadow: 0 0 22px rgba(255, 231, 102, 0.45); opacity: 0.88; }
+.result-panel::after { content: "RARE DROP"; position: absolute; top: 73px; right: 15px; font-size: 10px; font-weight: 900; color: #ffe766; letter-spacing: 0.06em; }
+@keyframes goldPulse { from { transform: translateY(0); opacity: 0.55; } to { transform: translateY(-4px); opacity: 0.95; } }
