@@ -96,8 +96,15 @@
     const img = new Image();
     img.draggable = false;
     img._ready = false;
-    img.onload = () => { img._ready = true; };
-    img.onerror = () => { img._error = true; };
+    img._warned = false;
+    img.onload = () => { img._ready = true; img._error = false; };
+    img.onerror = () => {
+      img._error = true;
+      if (!img._warned) {
+        console.warn(`[asset missing] ${path}`);
+        img._warned = true;
+      }
+    };
     img.src = path;
     imageCache.set(path, img);
     return img;
@@ -148,11 +155,11 @@
   };
 
   const enemyDefs = {
-    walker: { name: "クリーパー ショート", oniName: "クリーパー トール ドッピオ", cost: 1, hp: 20, speed: 36, damage: 3, radius: 12, color: "#ff7979", score: 12, oniScore: 36 },
-    runner: { name: "クリーパー トール", oniName: "クリーパー グランデ ドッピオ", cost: 3, hp: 16, speed: 70, damage: 3, radius: 10, color: "#ffb86b", score: 18, oniScore: 48 },
-    archer: { name: "クリーパー グランデ", oniName: "クリーパー ヴェンティ ドッピオ", cost: 5, hp: 24, speed: 24, damage: 3, radius: 12, color: "#f78bd8", score: 28, oniScore: 70, ranged: true, range: 250, cooldown: 2.6 },
-    splitter: { name: "クリーパー ヴェンティ", oniName: "クリーパー フラペチーノ ドッピオ", cost: 6, hp: 38, speed: 30, damage: 4, radius: 15, color: "#a3e635", score: 35, oniScore: 92, split: true },
-    hexer: { name: "クリーパー マキアート", oniName: "ハートブリード フラペチーノ ドッピオ", cost: 8, hp: 44, speed: 38, damage: 4, radius: 14, color: "#b58cff", score: 70, oniScore: 120, debuff: true },
+    walker: { name: "クリーパー ショート", oniName: "クリーパー トール ドッピオ", cost: 1, hp: 20, oniHp: 32, speed: 36, oniSpeed: 48, damage: 3, oniDamage: 5, radius: 12, color: "#ff7979", score: 12, oniScore: 42 },
+    runner: { name: "クリーパー トール", oniName: "クリーパー グランデ ドッピオ", cost: 3, hp: 16, oniHp: 36, speed: 70, oniSpeed: 82, damage: 3, oniDamage: 5, radius: 10, color: "#ffb86b", score: 18, oniScore: 62 },
+    archer: { name: "クリーパー グランデ", oniName: "クリーパー ヴェンティ ドッピオ", cost: 5, hp: 24, oniHp: 52, speed: 24, oniSpeed: 35, damage: 3, oniDamage: 5, radius: 12, color: "#f78bd8", score: 28, oniScore: 92, ranged: true, range: 250, cooldown: 2.6 },
+    splitter: { name: "クリーパー ヴェンティ", oniName: "クリーパー フラペチーノ ドッピオ", cost: 6, hp: 38, oniHp: 74, speed: 30, oniSpeed: 44, damage: 4, oniDamage: 6, radius: 15, color: "#a3e635", score: 35, oniScore: 126, split: true },
+    hexer: { name: "クリーパー マキアート", oniName: "ハートブリード フラペチーノ ドッピオ", cost: 8, hp: 54, oniHp: 96, speed: 42, oniSpeed: 54, damage: 5, oniDamage: 7, radius: 15, color: "#b58cff", score: 86, oniScore: 170, debuff: true },
   };
 
   const upgrades = {
@@ -289,7 +296,7 @@
   function spawnBudget(s) {
     const phase = currentPhase(s.t);
     let budget = 0.74 + phase * 0.62;
-    if (s.oni) budget = 4.2 + Math.min(8.0, s.oniTime * 0.17);
+    if (s.oni) budget = 5.2 + Math.min(12.0, s.oniTime * 0.24);
     if (phase >= 4) budget += 0.35;
     if (phase >= 5) budget += 0.55;
     if (s.t < 25) budget *= 0.72;
@@ -297,8 +304,8 @@
     if (!s.oni && s.cryptid.hp < 35) budget *= 0.58;
     if (!s.oni && s.enemies.length > 28) budget *= 0.35;
     if (!s.oni && s.enemies.length > 42) budget = 0;
-    if (s.oni && s.enemies.length > 84) budget *= 0.45;
-    if (s.oni && s.enemies.length > 130) budget = 0;
+    if (s.oni && s.enemies.length > 110) budget *= 0.45;
+    if (s.oni && s.enemies.length > 170) budget = 0;
     return budget;
   }
 
@@ -307,11 +314,11 @@
     if (s.oni) {
       const pool = ["walker", "runner", "archer", "splitter", "hexer"];
       const weights = pool.map(k => {
-        if (k === "walker") return 2.0;
+        if (k === "walker") return 1.6;
         if (k === "runner") return 2.2;
-        if (k === "archer") return 2.0;
-        if (k === "splitter") return 1.5 + Math.min(1.2, s.oniTime * 0.025);
-        if (k === "hexer") return 1.2 + Math.min(1.4, s.oniTime * 0.03);
+        if (k === "archer") return 2.25;
+        if (k === "splitter") return 2.15 + Math.min(1.8, s.oniTime * 0.035);
+        if (k === "hexer") return 1.85 + Math.min(2.0, s.oniTime * 0.04);
         return 1;
       });
       const total = weights.reduce((a, b) => a + b, 0);
@@ -330,9 +337,9 @@
     const weights = pool.map(k => {
       if (k === "walker") return Math.max(1, 5 - phase * 0.4);
       if (k === "runner") return 2 + phase * 0.2;
-      if (k === "archer") return phase >= 2 ? 1.6 : 0;
-      if (k === "splitter") return phase >= 3 ? 1.1 : 0;
-      if (k === "hexer") return phase >= 4 ? 1.8 : 0.75;
+      if (k === "archer") return phase >= 2 ? 1.8 : 0;
+      if (k === "splitter") return phase >= 3 ? 1.45 : 0;
+      if (k === "hexer") return phase >= 4 ? 2.1 : 0.9;
       return 1;
     });
     const total = weights.reduce((a, b) => a + b, 0);
@@ -353,12 +360,15 @@
     else if (side === 1) { x = W + 30; y = rand(-40, H + 40); }
     else if (side === 2) { x = rand(-40, W + 40); y = H + 30; }
     else { x = -30; y = rand(-40, H + 40); }
-    const oniHpMult = state.oni ? 1.9 + Math.min(1.2, state.oniTime * 0.025) : 1;
-    const oniSpeedMult = state.oni ? 1.25 + Math.min(0.35, state.oniTime * 0.008) : 1;
-    const oniDamageMult = state.oni ? 1.45 + Math.min(0.4, state.oniTime * 0.008) : 1;
+    const baseHp = state.oni ? (def.oniHp || def.hp * 1.8) : def.hp;
+    const baseSpeed = state.oni ? (def.oniSpeed || def.speed * 1.25) : def.speed;
+    const baseDamage = state.oni ? (def.oniDamage || def.damage * 1.5) : def.damage;
+    const oniHpMult = state.oni ? 1.0 + Math.min(1.25, state.oniTime * 0.026) : 1;
+    const oniSpeedMult = state.oni ? 1.0 + Math.min(0.42, state.oniTime * 0.009) : 1;
+    const oniDamageMult = state.oni ? 1.0 + Math.min(0.45, state.oniTime * 0.009) : 1;
     const e = {
-      type, x, y, r: def.radius, hp: def.hp * oniHpMult, maxHp: def.hp * oniHpMult,
-      speed: def.speed * oniSpeedMult, damage: def.damage * oniDamageMult, color: def.color, cd: rand(0.4, 1.2), warned: false, oni: state.oni,
+      type, x, y, r: def.radius, hp: baseHp * oniHpMult, maxHp: baseHp * oniHpMult,
+      speed: baseSpeed * oniSpeedMult, damage: baseDamage * oniDamageMult, color: def.color, cd: rand(0.4, 1.2), warned: false, oni: state.oni,
     };
     if (def.ranged || def.debuff) {
       state.warnings.push({ x, y, text: def.ranged ? "遠距離敵" : "妨害敵", life: 1.25, color: def.ranged ? "#f78bd8" : "#b58cff" });
@@ -703,14 +713,13 @@
       const nextMain = after[mainId] || 0;
       const nextSub = after[subId] || 0;
       const willEvolve = nextMain >= mainNeed && nextSub >= subNeed;
-      const touches = upgradeId === mainId || upgradeId === subId || nowMain > 0 || nowSub > 0;
+      const touches = upgradeId === mainId || upgradeId === subId;
       if (!touches) return;
       const beforeTotal = Math.min(nowMain, mainNeed) + Math.min(nowSub, subNeed);
       const afterTotal = Math.min(nextMain, mainNeed) + Math.min(nextSub, subNeed);
       const totalNeed = mainNeed + subNeed;
-      const missing = [];
-      if (nextMain < mainNeed) missing.push(`${upgrades[mainId].name}Lv${mainNeed}`);
-      if (nextSub < subNeed) missing.push(`${upgrades[subId].name}Lv${subNeed}`);
+      const conditionLine = `${upgrades[mainId].name}Lv${mainNeed} + ${upgrades[subId].name}Lv${subNeed}`;
+      const currentLine = `${upgrades[mainId].name}Lv${nextMain}/${mainNeed}・${upgrades[subId].name}Lv${nextSub}/${subNeed}`;
       list.push({
         evoId,
         name: evo.name,
@@ -719,8 +728,9 @@
         beforeTotal,
         afterTotal,
         totalNeed,
-        missing: missing.join(" + "),
-        line: `${upgrades[mainId].name}Lv${nextMain}/${mainNeed} + ${upgrades[subId].name}Lv${nextSub}/${subNeed}`
+        conditionLine,
+        currentLine,
+        line: currentLine
       });
     }
 
@@ -780,9 +790,9 @@
     const level = `<span class="level-pill">Lv${current} → Lv${next}</span>`;
     let evoHtml = "";
     if (will) {
-      evoHtml = `<div class="evo-box ready">${will.asset ? `<img src="${will.asset}" alt="${will.name}" onerror="this.style.display='none'" draggable="false">` : ""}<div><b>進化確定</b><span>${will.name}</span></div></div>`;
+      evoHtml = `<div class="evo-box ready">${will.asset ? `<img src="${will.asset}" alt="${will.name}" onerror="this.style.display='none'" draggable="false">` : ""}<div><b>進化確定</b><span>${will.name}</span><small>条件: ${will.conditionLine}</small></div></div>`;
     } else if (best) {
-      evoHtml = `<div class="evo-box"><div><b>進化候補</b><span>${best.name}: ${best.afterTotal}/${best.totalNeed}</span><small>必要: ${best.missing || "条件達成"}</small></div></div>`;
+      evoHtml = `<div class="evo-box"><div><b>${best.name}まで ${best.afterTotal}/${best.totalNeed}</b><span>条件: ${best.conditionLine}</span><small>現在: ${best.currentLine}</small></div></div>`;
     }
     btn.innerHTML = `${img}<div class="upgrade-title"><b>${u.name}</b>${level}</div><small class="upgrade-desc">${u.desc}</small>${evoHtml}`;
     btn.addEventListener("click", () => {

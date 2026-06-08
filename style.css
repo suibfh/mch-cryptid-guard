@@ -311,3 +311,43 @@ body.stick-right #pauseBtn { left: calc(var(--game-left, 0px) + 22px); }
   .evo-box b, .evo-box span, .evo-box small { font-size: 8.5px; line-height: 1.15; }
   .gold-chest-btn { float: none; width: 100%; justify-content: center; margin-bottom: 8px; padding: 8px 10px; }
 }
+
+/* v5.6: compact title/hero selection and confetti fallback */
+#startScreen {
+  width: min(96vw, 860px);
+  max-height: 94dvh;
+  overflow: auto;
+  padding: 18px;
+}
+#startScreen .brand { margin-bottom: 4px; font-size: 12px; }
+#startScreen h1 { font-size: clamp(25px, 5vw, 42px); margin: 0 0 6px; }
+#startScreen .lead { font-size: 14px; line-height: 1.45; margin: 0 0 12px; }
+#startScreen .grid.two { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 10px 0; }
+#startScreen .hero-card { min-height: 0; padding: 9px; border-radius: 12px; text-align: center; }
+#startScreen .hero-img { width: 46px; height: 46px; margin: 0 auto 5px; }
+#startScreen .hero-icon { font-size: 23px; margin: 0 0 5px; }
+#startScreen .hero-card b { display: block; font-size: 12px; line-height: 1.2; }
+#startScreen .hero-card small { font-size: 10px; line-height: 1.25; margin-top: 3px; }
+#startScreen .actions { gap: 7px; margin-top: 10px; }
+#startScreen .actions button { padding: 9px 12px; min-height: 40px; }
+#startScreen .score-line { margin-top: 7px; font-size: 12px; }
+.local-confetti-canvas { position: fixed; inset: 0; width: 100vw; height: 100dvh; pointer-events: none; z-index: 99999; }
+@media (max-width: 680px) {
+  #startScreen { width: 96vw; max-height: 92dvh; padding: 12px; }
+  #startScreen .lead { font-size: 12px; }
+  #startScreen .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  #startScreen .hero-card { padding: 7px; }
+  #startScreen .hero-img { width: 38px; height: 38px; }
+  #startScreen .hero-card b { font-size: 11px; }
+  #startScreen .hero-card small { font-size: 9px; }
+  #startScreen .actions { display: grid; grid-template-columns: 1fr 1fr; }
+  #startScreen .actions #startBtn { grid-column: 1 / -1; }
+  #startScreen .actions button { padding: 8px 10px; min-height: 36px; font-size: 12px; }
+}
+@media (max-height: 560px) {
+  #startScreen { padding: 10px; }
+  #startScreen h1 { font-size: 24px; }
+  #startScreen .lead { display: none; }
+  #startScreen .hero-img { width: 32px; height: 32px; }
+  #startScreen .hero-card small { display: none; }
+}
